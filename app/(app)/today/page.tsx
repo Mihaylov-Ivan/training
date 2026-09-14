@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { getRoutineById } from "@/lib/seed/routines";
+import type { TrainingSession } from "@/lib/types";
 import {
   formatDuration,
   greetingForNow,
@@ -23,15 +25,55 @@ import {
 } from "@/lib/training/schedule";
 import { cycleWeekForDate } from "@/lib/training/schedule";
 
+const MAINTENANCE_ROUTINE_ID = "routine-maintenance";
+
+function sessionDay(session: TrainingSession): string | null {
+  const stamp = session.ended_at ?? session.started_at;
+  return stamp ? stamp.slice(0, 10) : null;
+}
+
+function latestSessionForDay(
+  sessions: TrainingSession[],
+  opts: { routineId?: string; scheduledId?: string; day: string },
+): TrainingSession | undefined {
+  return sessions
+    .filter((t) => {
+      if (opts.routineId && t.routine_template_id !== opts.routineId) return false;
+      if (opts.scheduledId && t.scheduled_session_id !== opts.scheduledId)
+        return false;
+      return sessionDay(t) === opts.day;
+    })
+    .sort((a, b) => {
+      const aT = a.ended_at ?? a.started_at ?? "";
+      const bT = b.ended_at ?? b.started_at ?? "";
+      return bT.localeCompare(aT);
+    })[0];
+}
+
+function itemsAllFinished(
+  sessionId: string,
+  items: { training_session_id: string; status: string }[],
+): boolean {
+  const mine = items.filter((i) => i.training_session_id === sessionId);
+  return (
+    mine.length > 0 &&
+    mine.every((i) =>
+      ["completed", "partial", "skipped", "pain_limited"].includes(i.status),
+    )
+  );
+}
+
 export default function TodayPage() {
   const router = useRouter();
   const profile = useAppStore((s) => s.profile);
   const cycles = useAppStore((s) => s.cycles);
   const scheduled = useAppStore((s) => s.scheduledSessions);
   const trainingSessions = useAppStore((s) => s.trainingSessions);
+  const sessionItems = useAppStore((s) => s.sessionItems);
   const wellbeing = useAppStore((s) => s.wellbeingCheckins);
   const startSessionFromScheduled = useAppStore((s) => s.startSessionFromScheduled);
   const startMaintenance = useAppStore((s) => s.startMaintenance);
+  const completeSession = useAppStore((s) => s.completeSession);
   const saveWellbeing = useAppStore((s) => s.saveWellbeing);
 
   const today = todayISO();
@@ -55,14 +97,85 @@ export default function TodayPage() {
   const completedThisWeek = weekSessions.filter((s) => s.status === "completed").length;
   const totalThisWeek = weekSessions.length;
 
+  const todayMaintenance = useMemo(
+    () =>
+      latestSessionForDay(trainingSessions, {
+        routineId: MAINTENANCE_ROUTINE_ID,
+        day: today,
+      }) ??
+      // Fallback: unfinished session with no day stamp yet
+      trainingSessions
+        .filter(
+          (t) =>
+            t.routine_template_id === MAINTENANCE_ROUTINE_ID &&
+            (t.status === "planned" || t.status === "active") &&
+            !sessionDay(t),
+        )
+        .at(-1),
+    [trainingSessions, today],
+  );
+
+  const maintenanceDone =
+    todayMaintenance?.status === "completed" ||
+    (!!todayMaintenance && itemsAllFinished(todayMaintenance.id, sessionItems));
+  const maintenanceInProgress =
+    !maintenanceDone &&
+    todayMaintenance &&
+    (todayMaintenance.status === "active" ||
+      todayMaintenance.status === "planned");
+
+  const todayPrimary = useMemo(() => {
+    if (!todaySched) return undefined;
+    return (
+      latestSessionForDay(trainingSessions, {
+        scheduledId: todaySched.id,
+        day: today,
+      }) ??
+      trainingSessions
+        .filter((t) => t.scheduled_session_id === todaySched.id)
+        .sort((a, b) => {
+          const aT = a.ended_at ?? a.started_at ?? "";
+          const bT = b.ended_at ?? b.started_at ?? "";
+          return bT.localeCompare(aT);
+        })[0]
+    );
+  }, [trainingSessions, todaySched, today]);
+
+  const primaryDone =
+    todaySched?.status === "completed" ||
+    todayPrimary?.status === "completed" ||
+    (!!todayPrimary && itemsAllFinished(todayPrimary.id, sessionItems));
+  const primaryInProgress =
+    !primaryDone &&
+    todayPrimary &&
+    (todayPrimary.status === "active" || todayPrimary.status === "planned");
+
+  // Finalize sessions that finished all exercises but never hit "Done"
+  useEffect(() => {
+    if (
+      todayMaintenance &&
+      todayMaintenance.status !== "completed" &&
+      itemsAllFinished(todayMaintenance.id, sessionItems)
+    ) {
+      completeSession(todayMaintenance.id);
+    }
+  }, [todayMaintenance, sessionItems, completeSession]);
+
+  useEffect(() => {
+    if (
+      todayPrimary &&
+      todayPrimary.status !== "completed" &&
+      itemsAllFinished(todayPrimary.id, sessionItems)
+    ) {
+      completeSession(todayPrimary.id);
+    }
+  }, [todayPrimary, sessionItems, completeSession]);
+
   const overdue =
     todaySched &&
+    !primaryDone &&
     todaySched.status === "scheduled" &&
-    trainingSessions.every(
-      (t) =>
-        t.scheduled_session_id !== todaySched.id ||
-        (t.status !== "completed" && t.status !== "active"),
-    ) &&
+    !primaryInProgress &&
     new Date().getHours() >= 20;
 
   const nextShort = scheduled.find(
@@ -136,7 +249,15 @@ export default function TodayPage() {
       ) : null}
 
       <div className="space-y-3">
-        <Card>
+        <Card
+          className={
+            maintenanceDone
+              ? "border-success/40 bg-success-soft/30"
+              : maintenanceInProgress
+                ? "border-accent/40"
+                : ""
+          }
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -144,14 +265,51 @@ export default function TodayPage() {
               </p>
               <h2 className="mt-1 text-lg font-semibold">5-minute mobility</h2>
               <p className="mt-1 text-sm text-muted">
-                Neck + shoulders + spine + hips + ankles
+                {maintenanceDone
+                  ? "Completed today — neck, shoulders, spine, hips, ankles"
+                  : "Neck + shoulders + spine + hips + ankles"}
               </p>
             </div>
-            <Badge>5 min</Badge>
+            {maintenanceDone ? (
+              <Badge tone="success">
+                <span className="inline-flex items-center gap-1">
+                  <Check className="size-3.5" strokeWidth={3} aria-hidden />
+                  Done
+                </span>
+              </Badge>
+            ) : (
+              <Badge tone={maintenanceInProgress ? "accent" : "neutral"}>
+                {maintenanceInProgress ? "In progress" : "5 min"}
+              </Badge>
+            )}
           </div>
-          <PrimaryButton className="mt-4 w-full" onClick={launchMaintenance}>
-            Start
-          </PrimaryButton>
+          {maintenanceDone ? (
+            <div className="mt-4 flex gap-2">
+              <SecondaryButton
+                className="flex-1"
+                onClick={() =>
+                  todayMaintenance &&
+                  router.push(`/session/${todayMaintenance.id}/summary`)
+                }
+              >
+                View summary
+              </SecondaryButton>
+              <SecondaryButton className="flex-1" onClick={launchMaintenance}>
+                Do again
+              </SecondaryButton>
+            </div>
+          ) : maintenanceInProgress && todayMaintenance ? (
+            <PrimaryButton
+              className="mt-4 w-full"
+              onClick={() => router.push(`/session/${todayMaintenance.id}`)}
+            >
+              Continue
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton className="mt-4 w-full" onClick={launchMaintenance}>
+              Start
+            </PrimaryButton>
+          )}
         </Card>
 
         {isSunday ? (
@@ -164,26 +322,69 @@ export default function TodayPage() {
             </p>
           </Card>
         ) : todaySched && routine ? (
-          <Card className="border-accent/30">
+          <Card
+            className={
+              primaryDone
+                ? "border-success/40 bg-success-soft/30"
+                : "border-accent/30"
+            }
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide ${
+                    primaryDone ? "text-success" : "text-accent"
+                  }`}
+                >
                   Primary session
-                  {overdue ? " · Overdue" : ""}
+                  {primaryDone ? " · Complete" : overdue ? " · Overdue" : ""}
                 </p>
                 <h2 className="mt-1 text-xl font-semibold">{routine.name}</h2>
-                <p className="mt-1 text-sm text-muted">{routine.description}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {primaryDone
+                    ? "Logged for today — nice work."
+                    : routine.description}
+                </p>
               </div>
-              <Badge tone={overdue ? "warning" : "accent"}>
-                {formatDuration(routine.default_duration_min)}
-              </Badge>
+              {primaryDone ? (
+                <Badge tone="success">
+                  <span className="inline-flex items-center gap-1">
+                    <Check className="size-3.5" strokeWidth={3} aria-hidden />
+                    Done
+                  </span>
+                </Badge>
+              ) : (
+                <Badge tone={overdue ? "warning" : "accent"}>
+                  {primaryInProgress
+                    ? "In progress"
+                    : formatDuration(routine.default_duration_min)}
+                </Badge>
+              )}
             </div>
-            <PrimaryButton
-              className="mt-4 w-full"
-              onClick={() => launch(todaySched.id)}
-            >
-              Start workout
-            </PrimaryButton>
+            {primaryDone && todayPrimary ? (
+              <SecondaryButton
+                className="mt-4 w-full"
+                onClick={() =>
+                  router.push(`/session/${todayPrimary.id}/summary`)
+                }
+              >
+                View summary
+              </SecondaryButton>
+            ) : primaryInProgress && todayPrimary ? (
+              <PrimaryButton
+                className="mt-4 w-full"
+                onClick={() => router.push(`/session/${todayPrimary.id}`)}
+              >
+                Continue workout
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton
+                className="mt-4 w-full"
+                onClick={() => launch(todaySched.id)}
+              >
+                Start workout
+              </PrimaryButton>
+            )}
           </Card>
         ) : null}
 

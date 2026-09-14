@@ -258,6 +258,8 @@ export const useAppStore = create<AppState>()(
           states: get().progressionStates,
           dayRole: sched.day_role,
         });
+        // Stamp create time so Today can attribute planned sessions to a day.
+        session.started_at = new Date().toISOString();
         const todayWb = get().wellbeingCheckins.find((w) => w.date === todayISO());
         session.readiness_snapshot = todayWb ?? null;
         set((s) => ({
@@ -294,6 +296,8 @@ export const useAppStore = create<AppState>()(
           cycleWeek: cw,
           states: get().progressionStates,
         });
+        // Stamp create time so Today can attribute planned sessions to a day.
+        session.started_at = new Date().toISOString();
         set((s) => ({
           trainingSessions: [...s.trainingSessions, session],
           sessionItems: [...s.sessionItems, ...items],
