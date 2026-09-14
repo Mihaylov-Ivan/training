@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lifetime Athlete
 
-## Getting Started
+Personal training + wellbeing tracker (local-first). Built from the Lifetime Athlete build specification: Today-first UX, data-driven routines, exact prescriptions, rest timers, and exercise-specific progression.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router + TypeScript + Tailwind
+- Zustand (persisted local store)
+- Zod / Vitest
+- Supabase schema + RLS stubbed in `supabase/migrations` (not required to run)
+
+## Develop
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). First visit runs onboarding, then `/today`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test
+npm run typecheck
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Notes
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Workouts and progression rules live in `lib/seed/` and `lib/progression/` — not in React pages.
+- Starting a session snapshots prescriptions into `session_items`.
+- Rest timers use `rest_started_at` + duration (survives refresh).
+- To connect Supabase later: copy `.env.example`, apply `supabase/migrations/0001_schema.sql`, and swap the local store for the SSR clients in `lib/supabase/`.
