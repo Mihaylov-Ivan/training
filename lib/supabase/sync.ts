@@ -458,7 +458,10 @@ export async function pushFullSnapshot(snapshot: CloudSnapshot) {
 }
 
 export function queueOrSync(task: () => Promise<void>) {
-  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    // Deferred — AutoSync will pushFullSnapshot when back online
+    return;
+  }
   void task().catch((err) => {
     console.error("[supabase sync]", err);
   });

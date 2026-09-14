@@ -17,7 +17,9 @@ export default function SettingsPage() {
   const updateProfile = useAppStore((s) => s.updateProfile);
   const exportData = useAppStore((s) => s.exportData);
   const resetDemo = useAppStore((s) => s.resetDemo);
-  const pushToCloud = useAppStore((s) => s.pushToCloud);
+  const syncNow = useAppStore((s) => s.syncNow);
+  const lastSyncedAt = useAppStore((s) => s.lastSyncedAt);
+  const syncStatus = useAppStore((s) => s.syncStatus);
   const cloudSyncError = useAppStore((s) => s.cloudSyncError);
   const authUserId = useAppStore((s) => s.authUserId);
   const [syncing, setSyncing] = useState(false);
@@ -83,17 +85,25 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
-          <p className="text-sm text-muted">
-            Dark mode follows system preference. Units: {profile.units}.
+          <p className="font-semibold">Cloud sync</p>
+          <p className="mt-1 text-sm text-muted">
+            Changes sync automatically while you are online — about every 45s, plus when
+            you return to the app.
           </p>
           <p className="mt-2 text-xs text-muted break-all">
             Auth user: {authUserId ?? "not signed in"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Status: {syncStatus}
+            {lastSyncedAt
+              ? ` · Last synced ${new Date(lastSyncedAt).toLocaleString()}`
+              : ""}
           </p>
           {cloudSyncError ? (
             <p className="mt-2 text-sm text-danger">{cloudSyncError}</p>
           ) : null}
           {syncOk ? (
-            <p className="mt-2 text-sm text-success">Synced to Supabase.</p>
+            <p className="mt-2 text-sm text-success">Synced with Supabase.</p>
           ) : null}
         </Card>
 
@@ -103,12 +113,12 @@ export default function SettingsPage() {
           onClick={() => {
             setSyncing(true);
             setSyncOk(false);
-            void pushToCloud()
+            void syncNow()
               .then(() => setSyncOk(true))
               .finally(() => setSyncing(false));
           }}
         >
-          {syncing ? "Syncing…" : "Sync now to Supabase"}
+          {syncing ? "Syncing…" : "Sync now"}
         </PrimaryButton>
 
         <PrimaryButton

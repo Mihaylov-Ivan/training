@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AppNav } from "@/components/nav/app-nav";
 import { useAppStore } from "@/lib/store/app-store";
 import { OfflineBanner } from "@/components/offline-banner";
+import { AutoSync } from "@/components/providers/auto-sync";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl md:flex-row">
+      <AutoSync />
       <AppNav />
       <div className="flex min-h-dvh flex-1 flex-col">
         <OfflineBanner />

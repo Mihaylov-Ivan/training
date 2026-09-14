@@ -91,6 +91,8 @@ export interface AppState {
   pendingAdjustment: ScheduleAdjustmentProposal | null;
   /** review = end-of-day confirm; manual_miss = user tapped Mark missed */
   missPromptMode: "review" | "manual_miss" | null;
+  lastSyncedAt: string | null;
+  syncStatus: "idle" | "syncing" | "error" | "offline";
 
   setHydrated: (v: boolean) => void;
   setAuthUserId: (id: string | null) => void;
@@ -154,6 +156,8 @@ export interface AppState {
   exportData: () => string;
   resetDemo: () => void;
   pushToCloud: () => Promise<void>;
+  pullFromCloud: () => Promise<void>;
+  syncNow: () => Promise<void>;
 }
 
 const empty = {
@@ -179,6 +183,8 @@ const empty = {
   pendingMissedSessionId: null as string | null,
   pendingAdjustment: null as ScheduleAdjustmentProposal | null,
   missPromptMode: null as "review" | "manual_miss" | null,
+  lastSyncedAt: null as string | null,
+  syncStatus: "idle" as "idle" | "syncing" | "error" | "offline",
 };
 
 export const useAppStore = create<AppState>()(
@@ -1119,6 +1125,11 @@ export const useAppStore = create<AppState>()(
 
       pushToCloud: async () => {
         if (!isSupabaseConfigured() || !get().profile) return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          set({ syncStatus: "offline" });
+          return;
+        }
+        set({ syncStatus: "syncing" });
         try {
           await pushFullSnapshot({
             profile: get().profile,
@@ -1133,14 +1144,88 @@ export const useAppStore = create<AppState>()(
             progressionEvents: get().progressionEvents,
             wellbeingCheckins: get().wellbeingCheckins,
           });
-          set({ cloudSyncError: null });
+          set({
+            cloudSyncError: null,
+            lastSyncedAt: new Date().toISOString(),
+            syncStatus: "idle",
+          });
         } catch (e) {
           set({
             cloudSyncError:
               e instanceof Error ? e.message : "Cloud sync failed",
+            syncStatus: "error",
           });
           throw e;
         }
+      },
+
+      pullFromCloud: async () => {
+        if (!isSupabaseConfigured()) return;
+        const userId = get().authUserId ?? get().profile?.user_id;
+        if (!userId || userId === LOCAL_USER_ID) return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          set({ syncStatus: "offline" });
+          return;
+        }
+        set({ syncStatus: "syncing" });
+        try {
+          const { loadCloudSnapshot } = await import("@/lib/supabase/sync");
+          const cloud = await loadCloudSnapshot(userId);
+          if (!cloud?.profile?.onboarding_complete && !cloud?.profile) {
+            set({ syncStatus: "idle" });
+            return;
+          }
+          if (!cloud?.profile) {
+            set({ syncStatus: "idle" });
+            return;
+          }
+          const preserve = {
+            activeTimer: get().activeTimer,
+            currentSessionId: get().currentSessionId,
+            currentItemIndex: get().currentItemIndex,
+            awaitingCompletion: get().awaitingCompletion,
+          };
+          get().hydrateFromCloud({
+            ...cloud,
+            profile: {
+              ...cloud.profile,
+              onboarding_complete:
+                cloud.profile.onboarding_complete ||
+                (cloud.progressionStates?.length ?? 0) > 0 ||
+                (cloud.cycles?.length ?? 0) > 0,
+            },
+          });
+          if (preserve.currentSessionId) {
+            set({
+              activeTimer: preserve.activeTimer,
+              currentSessionId: preserve.currentSessionId,
+              currentItemIndex: preserve.currentItemIndex,
+              awaitingCompletion: preserve.awaitingCompletion,
+            });
+          }
+          set({
+            cloudSyncError: null,
+            lastSyncedAt: new Date().toISOString(),
+            syncStatus: "idle",
+          });
+        } catch (e) {
+          set({
+            cloudSyncError:
+              e instanceof Error ? e.message : "Cloud pull failed",
+            syncStatus: "error",
+          });
+        }
+      },
+
+      syncNow: async () => {
+        if (!isSupabaseConfigured() || !get().profile?.onboarding_complete) return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          set({ syncStatus: "offline" });
+          return;
+        }
+        // Push local first, then pull remote so other devices converge
+        await get().pushToCloud();
+        await get().pullFromCloud();
       },
     }),
     {
@@ -1163,6 +1248,7 @@ export const useAppStore = create<AppState>()(
         currentSessionId: s.currentSessionId,
         currentItemIndex: s.currentItemIndex,
         awaitingCompletion: s.awaitingCompletion,
+        lastSyncedAt: s.lastSyncedAt,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);
