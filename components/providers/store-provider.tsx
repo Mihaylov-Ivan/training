@@ -6,7 +6,7 @@ import {
   createClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
-import { loadCloudSnapshot } from "@/lib/supabase/sync";
+import { loadCloudSnapshot, queueOrSync, syncProfile } from "@/lib/supabase/sync";
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const setHydrated = useAppStore((s) => s.setHydrated);
@@ -15,6 +15,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const profile = useAppStore((s) => s.profile);
   const setAuthUserId = useAppStore((s) => s.setAuthUserId);
   const hydrateFromCloud = useAppStore((s) => s.hydrateFromCloud);
+  const adoptAuthUser = useAppStore((s) => s.adoptAuthUser);
   const authUserId = useAppStore((s) => s.authUserId);
   const [bootstrapping, setBootstrapping] = useState(true);
 
@@ -25,54 +26,99 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [hydrated, setHydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
+
+    if (!isSupabaseConfigured()) {
+      setBootstrapping(false);
+      return;
+    }
+
     let cancelled = false;
+    let loadGen = 0;
+    const supabase = createClient();
 
-    async function bootstrap() {
-      if (!isSupabaseConfigured()) {
-        if (!cancelled) setBootstrapping(false);
-        return;
-      }
+    async function loadForUser(userId: string | null) {
+      if (cancelled) return;
+      const gen = ++loadGen;
+      setBootstrapping(true);
+      setAuthUserId(userId);
+
       try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getClaims();
-        const userId = (data?.claims?.sub as string | undefined) ?? null;
-        if (cancelled) return;
-        setAuthUserId(userId);
+        if (!userId) return;
 
-        if (userId) {
-          const cloud = await loadCloudSnapshot(userId);
-          if (!cancelled && cloud?.profile?.onboarding_complete) {
-            // Prefer cloud when it has an onboarded profile
-            hydrateFromCloud(cloud);
-          } else if (
-            !cancelled &&
-            cloud &&
-            !cloud.profile &&
-            useAppStore.getState().profile?.user_id === userId
-          ) {
-            // Local profile already for this user — keep it
-          } else if (
-            !cancelled &&
-            useAppStore.getState().profile &&
-            useAppStore.getState().profile?.user_id !== userId
-          ) {
-            // Stale local-user data from before auth — clear onboarding until cloud/local for this uuid
-            useAppStore.getState().resetDemo();
-            setAuthUserId(userId);
+        const cloud = await loadCloudSnapshot(userId);
+        if (cancelled || gen !== loadGen) return;
+
+        const local = useAppStore.getState();
+        const cloudOnboarded = Boolean(cloud?.profile?.onboarding_complete);
+        const cloudLooksSetup =
+          Boolean(cloud?.profile) &&
+          ((cloud?.progressionStates?.length ?? 0) > 0 ||
+            (cloud?.cycles?.length ?? 0) > 0 ||
+            cloudOnboarded);
+
+        if (cloudLooksSetup && cloud?.profile) {
+          const profile = cloudOnboarded
+            ? cloud.profile
+            : { ...cloud.profile, onboarding_complete: true };
+          hydrateFromCloud({ ...cloud, profile });
+          if (!cloudOnboarded) {
+            queueOrSync(() => syncProfile(profile));
           }
+          return;
+        }
+
+        // Cloud empty, but this device already finished onboarding under another id
+        if (local.profile?.onboarding_complete) {
+          if (local.profile.user_id !== userId) {
+            adoptAuthUser(userId);
+          }
+          return;
+        }
+
+        // Stale guest/local row for a different user with no useful cloud data
+        if (local.profile && local.profile.user_id !== userId) {
+          useAppStore.getState().resetDemo();
+          setAuthUserId(userId);
         }
       } catch (err) {
         console.error("[auth bootstrap]", err);
       } finally {
-        if (!cancelled) setBootstrapping(false);
+        if (!cancelled && gen === loadGen) setBootstrapping(false);
       }
     }
 
-    if (hydrated) void bootstrap();
+    void supabase.auth.getUser().then(({ data }) => {
+      void loadForUser(data.user?.id ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        void loadForUser(null);
+        return;
+      }
+      if (event === "TOKEN_REFRESHED") {
+        setAuthUserId(session?.user?.id ?? null);
+        return;
+      }
+      // Re-load after login — fixes empty local store on a new device
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+        void loadForUser(session?.user?.id ?? null);
+      }
+    });
+
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
-  }, [hydrated, setAuthUserId, hydrateFromCloud]);
+  }, [
+    hydrated,
+    setAuthUserId,
+    hydrateFromCloud,
+    adoptAuthUser,
+  ]);
 
   useEffect(() => {
     if (hydrated && !bootstrapping && profile?.onboarding_complete) {

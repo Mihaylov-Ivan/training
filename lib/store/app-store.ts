@@ -95,6 +95,8 @@ export interface AppState {
   setHydrated: (v: boolean) => void;
   setAuthUserId: (id: string | null) => void;
   hydrateFromCloud: (snapshot: import("@/lib/supabase/sync").CloudSnapshot) => void;
+  /** Remap local onboarded data onto the authenticated user and push to cloud */
+  adoptAuthUser: (userId: string) => void;
   completeOnboarding: (draft: OnboardingDraft) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   ensureSchedule: () => void;
@@ -206,6 +208,58 @@ export const useAppStore = create<AppState>()(
           progressionEvents: snapshot.progressionEvents,
           wellbeingCheckins: snapshot.wellbeingCheckins,
           cloudSyncError: null,
+          authUserId: snapshot.profile.user_id,
+        });
+      },
+
+      adoptAuthUser: (userId) => {
+        const s = get();
+        if (!s.profile?.onboarding_complete) {
+          set({ authUserId: userId });
+          return;
+        }
+        const remap = <T extends { user_id: string }>(rows: T[]): T[] =>
+          rows.map((r) => ({ ...r, user_id: userId }));
+
+        const profile = { ...s.profile, user_id: userId };
+        const schedulePrefs = s.schedulePrefs
+          ? { ...s.schedulePrefs, user_id: userId }
+          : null;
+        const cycles = remap(s.cycles);
+        const scheduledSessions = remap(
+          normalizeScheduledSessions(s.scheduledSessions),
+        );
+        const trainingSessions = remap(s.trainingSessions);
+        const progressionStates = remap(s.progressionStates);
+        const progressionEvents = remap(s.progressionEvents);
+        const wellbeingCheckins = remap(s.wellbeingCheckins);
+
+        set({
+          authUserId: userId,
+          profile,
+          schedulePrefs,
+          cycles,
+          scheduledSessions,
+          trainingSessions,
+          progressionStates,
+          progressionEvents,
+          wellbeingCheckins,
+        });
+
+        queueOrSync(async () => {
+          await pushFullSnapshot({
+            profile,
+            schedulePrefs,
+            cycles,
+            scheduledSessions,
+            trainingSessions,
+            sessionItems: get().sessionItems,
+            setResults: get().setResults,
+            exerciseResults: get().exerciseResults,
+            progressionStates,
+            progressionEvents,
+            wellbeingCheckins,
+          });
         });
       },
 

@@ -16,6 +16,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     if (!profile?.onboarding_complete && !pathname?.startsWith("/onboarding")) {
       router.replace("/onboarding");
+      return;
+    }
+    if (profile?.onboarding_complete && pathname?.startsWith("/onboarding")) {
+      router.replace("/today");
     }
   }, [hydrated, profile, pathname, router]);
 

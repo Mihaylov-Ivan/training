@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FLAG_LEVELS,
@@ -23,6 +23,14 @@ const steps = [
 export default function OnboardingPage() {
   const router = useRouter();
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
+  const profile = useAppStore((s) => s.profile);
+
+  useEffect(() => {
+    if (profile?.onboarding_complete) {
+      router.replace("/today");
+    }
+  }, [profile?.onboarding_complete, router]);
+
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<OnboardingDraft>({
     units: "metric",
@@ -49,6 +57,14 @@ export default function OnboardingPage() {
     project_grade: "V4",
     weekday_map: defaultWeekdayMap() as OnboardingDraft["weekday_map"],
   });
+
+  if (profile?.onboarding_complete) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-muted">
+        Loading your training data…
+      </div>
+    );
+  }
 
   function finish() {
     completeOnboarding(draft);
