@@ -77,6 +77,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (hydrated && !bootstrapping && profile?.onboarding_complete) {
       ensureSchedule();
+      useAppStore.getState().scanPendingMissedSessions();
     }
   }, [hydrated, bootstrapping, profile, ensureSchedule, authUserId]);
 

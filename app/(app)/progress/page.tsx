@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useAppStore } from "@/lib/store/app-store";
 import { Card, PageHeader, Badge } from "@/components/ui/primitives";
 import { addDays, todayISO } from "@/lib/utils";
+import { adherenceMetrics } from "@/lib/training/adaptive-schedule";
 
 export default function ProgressPage() {
   const scheduled = useAppStore((s) => s.scheduledSessions);
@@ -19,10 +20,14 @@ export default function ProgressPage() {
     return windows.map((days) => {
       const from = addDays(today, -days + 1);
       const sched = scheduled.filter((s) => s.date >= from && s.date <= today);
-      const done = sched.filter((s) => s.status === "completed").length;
+      const done = sched.filter(
+        (s) => s.status === "completed" || s.status === "partially_completed",
+      ).length;
       return { days, done, total: sched.length };
     });
   }, [scheduled, today]);
+
+  const adherence = useMemo(() => adherenceMetrics(scheduled), [scheduled]);
 
   const oahs = states.find((s) => s.scope_id === "oahs");
   const planche = states.find((s) => s.scope_id === "planche");
@@ -47,6 +52,41 @@ export default function ProgressPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="mt-4">
+        <p className="text-sm font-semibold">Training adherence</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-muted">On planned date</p>
+            <p className="text-lg font-semibold">
+              {Math.round(adherence.overall.scheduled_adherence * 100)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-muted">Eventually completed</p>
+            <p className="text-lg font-semibold">
+              {Math.round(adherence.overall.eventual_completion_rate * 100)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-muted">Core workouts</p>
+            <p className="text-lg font-semibold">
+              {Math.round(adherence.core.eventual_completion_rate * 100)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-muted">Mobility</p>
+            <p className="text-lg font-semibold">
+              {Math.round(adherence.mobility.eventual_completion_rate * 100)}%
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Missed {adherence.overall.missed_sessions} · Rescheduled{" "}
+          {adherence.overall.rescheduled_sessions} · Completed after move{" "}
+          {adherence.overall.completed_after_reschedule}
+        </p>
+      </Card>
 
       <Card className="mt-4">
         <p className="text-sm text-muted">Completed sessions (all time)</p>

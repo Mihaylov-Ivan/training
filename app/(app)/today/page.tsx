@@ -24,6 +24,8 @@ import {
   isShortRole,
 } from "@/lib/training/schedule";
 import { cycleWeekForDate } from "@/lib/training/schedule";
+import { MissedSessionPrompt } from "@/components/schedule/missed-session-prompt";
+import { ScheduleAdjustmentPreview } from "@/components/schedule/schedule-adjustment-preview";
 
 const MAINTENANCE_ROUTINE_ID = "routine-maintenance";
 
@@ -74,14 +76,70 @@ export default function TodayPage() {
   const startSessionFromScheduled = useAppStore((s) => s.startSessionFromScheduled);
   const startMaintenance = useAppStore((s) => s.startMaintenance);
   const completeSession = useAppStore((s) => s.completeSession);
+  const beginManualMiss = useAppStore((s) => s.beginManualMiss);
   const saveWellbeing = useAppStore((s) => s.saveWellbeing);
 
   const today = todayISO();
   const cycle = cycles[0];
   const week = cycle ? cycleWeekForDate(cycle.start_date, today) : 1;
-  const todaySched = scheduled.find((s) => s.date === today);
+  const todaySched = useMemo(() => {
+    const rows = scheduled.filter((s) => s.date === today);
+    const actionable = rows.filter((s) =>
+      [
+        "scheduled",
+        "in_progress",
+        "completed",
+        "partially_completed",
+        "pending_missed_confirmation",
+      ].includes(s.status),
+    );
+    // Never treat a missed/skipped row as today's startable workout
+    return (
+      actionable.find((s) => isPrimaryRole(s.day_role)) ??
+      actionable.find((s) => isShortRole(s.day_role)) ??
+      actionable[0]
+    );
+  }, [scheduled, today]);
+
+  const todayMissed = useMemo(() => {
+    return scheduled
+      .filter(
+        (s) =>
+          s.date === today &&
+          (s.status === "missed" || s.status === "skipped") &&
+          (isPrimaryRole(s.day_role) || isShortRole(s.day_role)),
+      )
+      .sort((a, b) => {
+        // Prefer primary workouts in the missed list
+        const ap = isPrimaryRole(a.day_role) ? 0 : 1;
+        const bp = isPrimaryRole(b.day_role) ? 0 : 1;
+        return ap - bp;
+      });
+  }, [scheduled, today]);
+
+  const makeupForMissed = useMemo(() => {
+    return todayMissed
+      .map((missed) => ({
+        missed,
+        makeup: scheduled.find(
+          (s) =>
+            s.rescheduled_from_id === missed.id &&
+            (s.status === "scheduled" ||
+              s.status === "in_progress" ||
+              s.status === "completed" ||
+              s.status === "partially_completed"),
+        ),
+      }))
+      .filter((x) => x.makeup);
+  }, [todayMissed, scheduled]);
+
   const checkin = wellbeing.find((w) => w.date === today);
   const ready = readinessPercent(checkin ?? null);
+
+  const scanPendingMissedSessions = useAppStore((s) => s.scanPendingMissedSessions);
+  useEffect(() => {
+    scanPendingMissedSessions();
+  }, [scanPendingMissedSessions, scheduled.length]);
 
   const weekSessions = useMemo(() => {
     if (!cycle) return [];
@@ -94,8 +152,15 @@ export default function TodayPage() {
     });
   }, [scheduled, cycle, week]);
 
-  const completedThisWeek = weekSessions.filter((s) => s.status === "completed").length;
-  const totalThisWeek = weekSessions.length;
+  const completedThisWeek = weekSessions.filter(
+    (s) => s.status === "completed" || s.status === "partially_completed",
+  ).length;
+  const totalThisWeek = weekSessions.filter(
+    (s) =>
+      s.status !== "missed" &&
+      s.status !== "skipped" &&
+      s.status !== "cancelled",
+  ).length;
 
   const todayMaintenance = useMemo(
     () =>
@@ -143,6 +208,7 @@ export default function TodayPage() {
 
   const primaryDone =
     todaySched?.status === "completed" ||
+    todaySched?.status === "partially_completed" ||
     todayPrimary?.status === "completed" ||
     (!!todayPrimary && itemsAllFinished(todayPrimary.id, sessionItems));
   const primaryInProgress =
@@ -207,6 +273,12 @@ export default function TodayPage() {
 
   const isSunday = todaySched?.day_role === "recovery";
   const isDeload = week === 4;
+  const showRecoveryCard =
+    todaySched?.day_role === "recovery" ||
+    (!todaySched &&
+      scheduled.some(
+        (s) => s.date === today && s.day_role === "recovery",
+      ));
 
   return (
     <div className="mx-auto max-w-xl">
@@ -312,16 +384,56 @@ export default function TodayPage() {
           )}
         </Card>
 
-        {isSunday ? (
-          <Card>
-            <Badge tone="accent">Recovery Day</Badge>
-            <h2 className="mt-2 text-xl font-semibold">Sunday recovery</h2>
-            <p className="mt-1 text-sm text-muted">
-              Maintenance only today. Optional easy walking is encouraged — no structured
-              workout.
-            </p>
-          </Card>
-        ) : todaySched && routine ? (
+        {todayMissed.length > 0 ? (
+          <div className="space-y-3">
+            {todayMissed.map((missed) => {
+              const missedRoutine = getRoutineById(missed.routine_template_id);
+              const pair = makeupForMissed.find((m) => m.missed.id === missed.id);
+              const reasonLabel = missed.missed_reason
+                ? missed.missed_reason.replaceAll("_", " ")
+                : null;
+              return (
+                <Card
+                  key={missed.id}
+                  className="border-danger/40 bg-danger-soft/25"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger">
+                        {missed.status === "skipped" ? "Skipped" : "Missed"} today
+                      </p>
+                      <h2 className="mt-1 text-lg font-semibold line-through decoration-danger/50">
+                        {missedRoutine?.name ??
+                          missed.day_role.replaceAll("_", " ")}
+                      </h2>
+                      <p className="mt-1 text-sm text-muted">
+                        {reasonLabel
+                          ? `Reason: ${reasonLabel}`
+                          : "Logged as not completed."}
+                        {pair?.makeup
+                          ? ` · Moved to ${pair.makeup.date}`
+                          : " · Not rescheduled"}
+                      </p>
+                    </div>
+                    <Badge tone="danger">
+                      {missed.status === "skipped" ? "Skipped" : "× Missed"}
+                    </Badge>
+                  </div>
+                  {pair?.makeup ? (
+                    <SecondaryButton
+                      className="mt-4 w-full"
+                      onClick={() => router.push("/plan")}
+                    >
+                      View new date on Plan
+                    </SecondaryButton>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {todaySched && routine && todaySched.day_role !== "recovery" ? (
           <Card
             className={
               primaryDone
@@ -336,14 +448,18 @@ export default function TodayPage() {
                     primaryDone ? "text-success" : "text-accent"
                   }`}
                 >
-                  Primary session
+                  {todaySched.rescheduled_from_id || todaySched.auto_rescheduled
+                    ? "Rescheduled session"
+                    : "Primary session"}
                   {primaryDone ? " · Complete" : overdue ? " · Overdue" : ""}
                 </p>
                 <h2 className="mt-1 text-xl font-semibold">{routine.name}</h2>
                 <p className="mt-1 text-sm text-muted">
                   {primaryDone
                     ? "Logged for today — nice work."
-                    : routine.description}
+                    : todaySched.rescheduled_from_id || todaySched.auto_rescheduled
+                      ? `Moved here from ${todaySched.original_date}. Your programme was adjusted.`
+                      : routine.description}
                 </p>
               </div>
               {primaryDone ? (
@@ -353,6 +469,8 @@ export default function TodayPage() {
                     Done
                   </span>
                 </Badge>
+              ) : todaySched.rescheduled_from_id || todaySched.auto_rescheduled ? (
+                <Badge tone="accent">↪ Rescheduled</Badge>
               ) : (
                 <Badge tone={overdue ? "warning" : "accent"}>
                   {primaryInProgress
@@ -371,20 +489,51 @@ export default function TodayPage() {
                 View summary
               </SecondaryButton>
             ) : primaryInProgress && todayPrimary ? (
-              <PrimaryButton
-                className="mt-4 w-full"
-                onClick={() => router.push(`/session/${todayPrimary.id}`)}
-              >
-                Continue workout
-              </PrimaryButton>
+              <div className="mt-4 space-y-2">
+                <PrimaryButton
+                  className="w-full"
+                  onClick={() => router.push(`/session/${todayPrimary.id}`)}
+                >
+                  Continue workout
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => beginManualMiss(todaySched.id)}
+                >
+                  Mark as missed
+                </SecondaryButton>
+              </div>
             ) : (
-              <PrimaryButton
-                className="mt-4 w-full"
-                onClick={() => launch(todaySched.id)}
-              >
-                Start workout
-              </PrimaryButton>
+              <div className="mt-4 space-y-2">
+                <PrimaryButton
+                  className="w-full"
+                  onClick={() => launch(todaySched.id)}
+                >
+                  Start workout
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => beginManualMiss(todaySched.id)}
+                >
+                  Mark as missed
+                </SecondaryButton>
+              </div>
             )}
+          </Card>
+        ) : showRecoveryCard || isSunday ? (
+          <Card>
+            <Badge tone="accent">Recovery Day</Badge>
+            <h2 className="mt-2 text-xl font-semibold">Sunday recovery</h2>
+            <p className="mt-1 text-sm text-muted">
+              Maintenance only today. Optional easy walking is encouraged — no structured
+              workout.
+            </p>
+          </Card>
+        ) : todayMissed.length === 0 ? (
+          <Card>
+            <p className="text-sm text-muted">
+              No structured workout scheduled for today.
+            </p>
           </Card>
         ) : null}
 
@@ -430,6 +579,9 @@ export default function TodayPage() {
           }}
         />
       ) : null}
+
+      <MissedSessionPrompt />
+      <ScheduleAdjustmentPreview />
     </div>
   );
 }

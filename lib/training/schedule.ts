@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types";
 import { getRoutineForDayRole } from "@/lib/seed/routines";
 import { addDays, todayISO, uid, weekday } from "@/lib/utils";
+import { normalizeScheduledSession } from "@/lib/training/normalize-schedule";
 
 const BASE_ROLES: Record<number, DayRole> = {
   0: "recovery",
@@ -68,6 +69,15 @@ export function createActiveCycle(
   };
 }
 
+function isMainWorkoutRoleLocal(role: DayRole): boolean {
+  return [
+    "strength_power",
+    "athleticism_endurance",
+    "calisthenics_volume",
+    "climbing",
+  ].includes(role);
+}
+
 export function generateScheduledSessions(opts: {
   userId: string;
   cycle: TrainingCycle;
@@ -76,9 +86,11 @@ export function generateScheduledSessions(opts: {
   existing?: ScheduledSession[];
 }): ScheduledSession[] {
   const weeks = opts.weeksAhead ?? 6;
-  const existingDates = new Set((opts.existing ?? []).map((s) => s.date));
-  const out: ScheduledSession[] = [...(opts.existing ?? [])];
+  const existing = (opts.existing ?? []).map(normalizeScheduledSession);
+  const existingDates = new Set(existing.map((s) => s.date));
+  const out: ScheduledSession[] = [...existing];
   const start = opts.cycle.start_date;
+  let sequence = Math.max(0, ...existing.map((s) => s.sequence_index), 0);
 
   for (let i = 0; i < weeks * 7; i++) {
     const date = addDays(start, i);
@@ -87,19 +99,33 @@ export function generateScheduledSessions(opts: {
     const wd = weekday(date);
     const role = resolveDayRole(cw, wd, opts.weekdayMap);
     const routine = getRoutineForDayRole(role, cw);
+    if (isMainWorkoutRoleLocal(role)) sequence += 1;
 
-    // Also schedule daily maintenance on non-recovery days as separate card on Today,
-    // but scheduled_sessions for primary day roles only + recovery maintenance.
-    out.push({
-      id: uid("sched"),
-      user_id: opts.userId,
-      date,
-      routine_template_id: routine.id,
-      cycle_week: cw,
-      day_role: role,
-      status: "scheduled",
-      generated_from_schedule: true,
-    });
+    out.push(
+      normalizeScheduledSession({
+        id: uid("sched"),
+        user_id: opts.userId,
+        date,
+        original_date: date,
+        routine_template_id: routine.id,
+        cycle_week: cw,
+        cycle_number: opts.cycle.cycle_number,
+        day_role: role,
+        status: "scheduled",
+        generated_from_schedule: true,
+        completed_at: null,
+        reschedule_count: 0,
+        missed_reason: null,
+        sequence_index: isMainWorkoutRoleLocal(role) ? sequence : 0,
+        is_deload: cw === 4,
+        auto_rescheduled: false,
+        manually_rescheduled: false,
+        rescheduled_from_id: null,
+        missed_note: null,
+        injury_area: null,
+        injury_exercise: null,
+      }),
+    );
   }
 
   return out.sort((a, b) => a.date.localeCompare(b.date));

@@ -5,16 +5,20 @@ import { persist } from "zustand/middleware";
 import type {
   ActiveTimer,
   ExerciseResult,
+  MissOutcome,
+  MissReason,
   OfflineMutation,
   OnboardingDraft,
   Profile,
   ProgressionEvent,
   ProgressionState,
+  ScheduleAdjustmentProposal,
   ScheduledSession,
   SchedulePreferences,
   SessionItem,
   SetResult,
   TrainingCycle,
+  TrainingPause,
   TrainingSession,
   WellbeingCheckin,
 } from "@/lib/types";
@@ -29,6 +33,13 @@ import {
   createActiveCycle,
   generateScheduledSessions,
 } from "@/lib/training/schedule";
+import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
+import {
+  buildTrainingPause,
+  detectPendingMissedSessions,
+  markPastSessionsPending,
+  recalculateSchedule,
+} from "@/lib/training/adaptive-schedule";
 import { snapshotSession } from "@/lib/training/snapshot";
 import { getRoutineById } from "@/lib/seed/routines";
 import {
@@ -75,6 +86,11 @@ export interface AppState {
   currentSessionId: string | null;
   currentItemIndex: number;
   awaitingCompletion: boolean;
+  trainingPause: TrainingPause | null;
+  pendingMissedSessionId: string | null;
+  pendingAdjustment: ScheduleAdjustmentProposal | null;
+  /** review = end-of-day confirm; manual_miss = user tapped Mark missed */
+  missPromptMode: "review" | "manual_miss" | null;
 
   setHydrated: (v: boolean) => void;
   setAuthUserId: (id: string | null) => void;
@@ -108,6 +124,30 @@ export interface AppState {
   resumeSession: (sessionId: string) => void;
   abandonSession: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
+  scanPendingMissedSessions: () => void;
+  beginManualMiss: (scheduledId: string) => void;
+  cancelMissPrompt: () => void;
+  resolveMissedSession: (opts: {
+    scheduledId: string;
+    outcome: MissOutcome;
+    reason?: MissReason | null;
+    injuryArea?: string | null;
+    injuryExercise?: string | null;
+    forceSkip?: boolean;
+    manualTargetDate?: string | null;
+  }) => ScheduleAdjustmentProposal | null;
+  applyScheduleAdjustment: (proposal: ScheduleAdjustmentProposal) => void;
+  dismissScheduleAdjustment: () => void;
+  keepOriginalSchedule: (
+    scheduledId: string,
+    reason?: MissReason | null,
+  ) => void;
+  moveScheduledSession: (scheduledId: string, toDate: string) => void;
+  skipScheduledSession: (
+    scheduledId: string,
+    reason?: MissReason | null,
+  ) => void;
+  resumeTrainingPause: () => void;
   undoProgression: (eventId: string) => void;
   exportData: () => string;
   resetDemo: () => void;
@@ -133,6 +173,10 @@ const empty = {
   currentSessionId: null as string | null,
   currentItemIndex: 0,
   awaitingCompletion: false,
+  trainingPause: null as TrainingPause | null,
+  pendingMissedSessionId: null as string | null,
+  pendingAdjustment: null as ScheduleAdjustmentProposal | null,
+  missPromptMode: null as "review" | "manual_miss" | null,
 };
 
 export const useAppStore = create<AppState>()(
@@ -151,7 +195,9 @@ export const useAppStore = create<AppState>()(
           profile: snapshot.profile,
           schedulePrefs: snapshot.schedulePrefs,
           cycles: snapshot.cycles,
-          scheduledSessions: snapshot.scheduledSessions,
+          scheduledSessions: normalizeScheduledSessions(
+            snapshot.scheduledSessions,
+          ),
           trainingSessions: snapshot.trainingSessions,
           sessionItems: snapshot.sessionItems,
           setResults: snapshot.setResults,
@@ -228,7 +274,7 @@ export const useAppStore = create<AppState>()(
           cycle: cycles[0],
           weeksAhead: 6,
           weekdayMap: schedulePrefs?.weekday_map,
-          existing: scheduledSessions,
+          existing: normalizeScheduledSessions(scheduledSessions),
         });
         set({ scheduledSessions: next });
         queueOrSync(() => syncScheduledSessions(next));
@@ -651,7 +697,11 @@ export const useAppStore = create<AppState>()(
           scheduledSessions: s.scheduledSessions.map((sch) =>
             session?.scheduled_session_id &&
             sch.id === session.scheduled_session_id
-              ? { ...sch, status: "completed" }
+              ? {
+                  ...sch,
+                  status: "completed" as const,
+                  completed_at: new Date().toISOString(),
+                }
               : sch,
           ),
           activeTimer: null,
@@ -672,6 +722,297 @@ export const useAppStore = create<AppState>()(
             }
           });
         }
+      },
+
+      scanPendingMissedSessions: () => {
+        const today = todayISO();
+        const pause = get().trainingPause;
+        if (pause?.active) return;
+        if (get().missPromptMode === "manual_miss") return;
+        const previous = get().scheduledSessions;
+        const marked = markPastSessionsPending(
+          normalizeScheduledSessions(previous),
+          today,
+        );
+        const pending = detectPendingMissedSessions(marked, today);
+        const next =
+          pending.find((s) =>
+            [
+              "strength_power",
+              "athleticism_endurance",
+              "calisthenics_volume",
+              "climbing",
+              "swim_performance",
+              "swim_recovery",
+            ].includes(s.day_role),
+          ) ?? pending[0];
+        set({
+          scheduledSessions: marked,
+          pendingMissedSessionId: next?.id ?? null,
+          missPromptMode: next ? "review" : null,
+        });
+        const changed = marked.some((s) => {
+          const old = previous.find((p) => p.id === s.id);
+          return !old || old.status !== s.status;
+        });
+        if (changed) {
+          queueOrSync(() => syncScheduledSessions(marked));
+        }
+      },
+
+      beginManualMiss: (scheduledId) => {
+        const sessions = normalizeScheduledSessions(get().scheduledSessions);
+        const target = sessions.find((s) => s.id === scheduledId);
+        if (!target) return;
+        if (
+          target.status === "completed" ||
+          target.status === "partially_completed" ||
+          target.status === "missed" ||
+          target.status === "skipped" ||
+          target.status === "cancelled"
+        ) {
+          return;
+        }
+        const updated = sessions.map((s) =>
+          s.id === scheduledId
+            ? { ...s, status: "pending_missed_confirmation" as const }
+            : s,
+        );
+        set({
+          scheduledSessions: updated,
+          pendingMissedSessionId: scheduledId,
+          missPromptMode: "manual_miss",
+          pendingAdjustment: null,
+        });
+      },
+
+      cancelMissPrompt: () => {
+        const id = get().pendingMissedSessionId;
+        const mode = get().missPromptMode;
+        if (mode === "manual_miss" && id) {
+          // Revert pending status back to scheduled if user cancels manual miss
+          set((s) => ({
+            scheduledSessions: s.scheduledSessions.map((row) =>
+              row.id === id && row.status === "pending_missed_confirmation"
+                ? { ...row, status: "scheduled" as const }
+                : row,
+            ),
+            pendingMissedSessionId: null,
+            missPromptMode: null,
+          }));
+          return;
+        }
+        set({ pendingMissedSessionId: null, missPromptMode: null });
+      },
+
+      resolveMissedSession: ({
+        scheduledId,
+        outcome,
+        reason = null,
+        injuryArea = null,
+        injuryExercise = null,
+        forceSkip = false,
+        manualTargetDate = null,
+      }: {
+        scheduledId: string;
+        outcome: MissOutcome;
+        reason?: MissReason | null;
+        injuryArea?: string | null;
+        injuryExercise?: string | null;
+        forceSkip?: boolean;
+        manualTargetDate?: string | null;
+      }) => {
+        const cycle = get().cycles[0];
+        const sessions = normalizeScheduledSessions(get().scheduledSessions);
+        const target = sessions.find((s) => s.id === scheduledId);
+        if (!target || !cycle) return null;
+
+        if (outcome === "completed" || outcome === "partially_completed") {
+          const updated = sessions.map((s) =>
+            s.id === scheduledId
+              ? {
+                  ...s,
+                  status: outcome,
+                  completed_at: new Date().toISOString(),
+                  missed_reason: null,
+                }
+              : s,
+          );
+          set({
+            scheduledSessions: updated,
+            pendingMissedSessionId: null,
+            missPromptMode: null,
+            pendingAdjustment: null,
+          });
+          queueOrSync(() => syncScheduledSessions(updated));
+          return null;
+        }
+
+        const proposal = recalculateSchedule({
+          missedSession: target,
+          upcomingSessions: sessions,
+          cycle,
+          reason,
+          injuryArea,
+          injuryExercise,
+          forceSkip,
+          manualTargetDate,
+        });
+
+        if (proposal.recommendation === "pause" && reason) {
+          const streak = proposal.warnings.length; // approximate; engine embeds days via pause builder
+          const pause = buildTrainingPause(
+            reason,
+            Math.max(1, streak),
+            new Date().toISOString(),
+          );
+          // Prefer computing missed days from consecutive misses ending at target
+          let missedDays = 1;
+          for (let i = 1; i <= 21; i++) {
+            const d = new Date(target.date + "T12:00:00");
+            d.setDate(d.getDate() - i);
+            const iso = d.toISOString().slice(0, 10);
+            const day = sessions.filter((s) => s.date === iso);
+            if (
+              day.length &&
+              day.every((s) => s.status === "missed" || s.status === "skipped")
+            ) {
+              missedDays += 1;
+            } else break;
+          }
+          set({
+            trainingPause: buildTrainingPause(
+              reason,
+              missedDays,
+              new Date().toISOString(),
+            ),
+            pendingAdjustment: proposal,
+            pendingMissedSessionId: scheduledId,
+          });
+          void pause;
+          return proposal;
+        }
+
+        // Minor skips apply immediately without preview
+        if (
+          proposal.recommendation === "skip_and_resume" &&
+          proposal.moved_sessions.length === 0
+        ) {
+          set({
+            scheduledSessions: proposal.updated_sessions,
+            pendingMissedSessionId: null,
+            missPromptMode: null,
+            pendingAdjustment: null,
+          });
+          queueOrSync(() =>
+            syncScheduledSessions(proposal.updated_sessions),
+          );
+          return proposal;
+        }
+
+        set({
+          pendingAdjustment: proposal,
+          pendingMissedSessionId: scheduledId,
+          missPromptMode: get().missPromptMode ?? "review",
+        });
+        return proposal;
+      },
+
+      applyScheduleAdjustment: (proposal: ScheduleAdjustmentProposal) => {
+        set({
+          scheduledSessions: proposal.updated_sessions,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+          trainingPause:
+            proposal.recommendation === "pause"
+              ? get().trainingPause
+              : get().trainingPause,
+        });
+        queueOrSync(() => syncScheduledSessions(proposal.updated_sessions));
+      },
+
+      dismissScheduleAdjustment: () => {
+        set({ pendingAdjustment: null });
+      },
+
+      keepOriginalSchedule: (scheduledId, reason = null) => {
+        const sessions = normalizeScheduledSessions(get().scheduledSessions);
+        const updated = sessions.map((s) =>
+          s.id === scheduledId
+            ? {
+                ...s,
+                status: "missed" as const,
+                missed_reason: reason,
+              }
+            : s,
+        );
+        set({
+          scheduledSessions: updated,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+        });
+        queueOrSync(() => syncScheduledSessions(updated));
+      },
+
+      moveScheduledSession: (scheduledId, toDate) => {
+        const cycle = get().cycles[0];
+        const sessions = normalizeScheduledSessions(get().scheduledSessions);
+        const target = sessions.find((s) => s.id === scheduledId);
+        if (!target || !cycle) return;
+        const proposal = recalculateSchedule({
+          missedSession: target,
+          upcomingSessions: sessions,
+          cycle,
+          reason: target.missed_reason ?? "no_time",
+          manualTargetDate: toDate,
+        });
+        // Mark as manually rescheduled on makeups
+        const updated = proposal.updated_sessions.map((s) =>
+          s.rescheduled_from_id === target.id
+            ? { ...s, manually_rescheduled: true, auto_rescheduled: false }
+            : s,
+        );
+        set({
+          scheduledSessions: updated,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+        });
+        queueOrSync(() => syncScheduledSessions(updated));
+      },
+
+      skipScheduledSession: (scheduledId, reason = null) => {
+        const cycle = get().cycles[0];
+        const sessions = normalizeScheduledSessions(get().scheduledSessions);
+        const target = sessions.find((s) => s.id === scheduledId);
+        if (!target || !cycle) return;
+        const proposal = recalculateSchedule({
+          missedSession: target,
+          upcomingSessions: sessions,
+          cycle,
+          reason,
+          forceSkip: true,
+        });
+        set({
+          scheduledSessions: proposal.updated_sessions,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+        });
+        queueOrSync(() => syncScheduledSessions(proposal.updated_sessions));
+      },
+
+      resumeTrainingPause: () => {
+        const pause = get().trainingPause;
+        if (!pause) {
+          set({ trainingPause: null });
+          return;
+        }
+        set({
+          trainingPause: { ...pause, active: false },
+        });
       },
 
       undoProgression: (eventId) => {

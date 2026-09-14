@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
 import type {
   Profile,
   ProgressionEvent,
@@ -82,11 +83,24 @@ export async function syncScheduledSessions(rows: ScheduledSession[]) {
         id: s.id,
         user_id: s.user_id,
         date: s.date,
+        original_date: s.original_date ?? s.date,
         routine_template_id: s.routine_template_id,
         cycle_week: s.cycle_week,
+        cycle_number: s.cycle_number ?? 1,
         day_role: s.day_role,
         status: s.status,
         generated_from_schedule: s.generated_from_schedule,
+        completed_at: s.completed_at,
+        reschedule_count: s.reschedule_count ?? 0,
+        missed_reason: s.missed_reason,
+        sequence_index: s.sequence_index ?? 0,
+        is_deload: s.is_deload ?? s.cycle_week === 4,
+        auto_rescheduled: s.auto_rescheduled ?? false,
+        manually_rescheduled: s.manually_rescheduled ?? false,
+        rescheduled_from_id: s.rescheduled_from_id,
+        missed_note: s.missed_note,
+        injury_area: s.injury_area,
+        injury_exercise: s.injury_exercise,
       })),
     );
     if (error) throw error;
@@ -372,7 +386,9 @@ export async function loadCloudSnapshot(
         }
       : null,
     cycles: (cyclesRes.data ?? []) as TrainingCycle[],
-    scheduledSessions: (schedRes.data ?? []) as ScheduledSession[],
+    scheduledSessions: normalizeScheduledSessions(
+      (schedRes.data ?? []) as ScheduledSession[],
+    ),
     trainingSessions: sessions.map((s) => ({
       ...s,
       cycle_week: (s as TrainingSession).cycle_week ?? 1,

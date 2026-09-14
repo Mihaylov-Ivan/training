@@ -57,7 +57,41 @@ export type SessionStatus =
   | "completed"
   | "abandoned";
 
-export type ScheduledStatus = "scheduled" | "completed" | "skipped" | "overdue";
+export type ScheduledStatus =
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "partially_completed"
+  | "missed"
+  | "skipped"
+  | "cancelled"
+  | "pending_missed_confirmation"
+  /** @deprecated prefer pending_missed_confirmation */
+  | "overdue";
+
+export type MissReason =
+  | "no_time"
+  | "fatigue"
+  | "poor_sleep"
+  | "illness"
+  | "pain_or_injury"
+  | "travel"
+  | "forgot"
+  | "intentional_rest"
+  | "other";
+
+export type AdaptiveSessionKind =
+  | "MAIN_WORKOUT"
+  | "SKILL_PRACTICE"
+  | "MOBILITY_RECOVERY"
+  | "DEEP_FLEXIBILITY"
+  | "DAILY_MAINTENANCE"
+  | "RUNNING"
+  | "SWIMMING"
+  | "CLIMBING"
+  | "DELOAD_WORKOUT";
+
+export type MissOutcome = "completed" | "partially_completed" | "missed";
 
 export type DayRole =
   | "strength_power"
@@ -179,12 +213,60 @@ export interface TrainingCycle {
 export interface ScheduledSession {
   id: string;
   user_id: string;
+  /** Live calendar date for this instance */
   date: string;
+  /** First planned date (preserved when moved) */
+  original_date: string;
   routine_template_id: string;
   cycle_week: 1 | 2 | 3 | 4;
+  cycle_number: number;
   day_role: DayRole;
   status: ScheduledStatus;
   generated_from_schedule: boolean;
+  completed_at: string | null;
+  reschedule_count: number;
+  missed_reason: MissReason | null;
+  /** Programme order among core sessions (A→B→C) */
+  sequence_index: number;
+  is_deload: boolean;
+  auto_rescheduled: boolean;
+  manually_rescheduled: boolean;
+  /** Prior missed instance this makeup replaces */
+  rescheduled_from_id: string | null;
+  missed_note: string | null;
+  injury_area: string | null;
+  injury_exercise: string | null;
+}
+
+export interface TrainingPause {
+  active: boolean;
+  reason: MissReason;
+  paused_at: string;
+  /** Consecutive calendar days without meaningful training */
+  missed_days: number;
+  return_protocol: "none" | "mild" | "full";
+}
+
+export interface ScheduleMove {
+  from_date: string;
+  to_date: string;
+  session_id: string;
+  day_role: DayRole;
+  routine_template_id: string;
+  label: string;
+}
+
+export interface ScheduleAdjustmentProposal {
+  id: string;
+  missed_session_id: string;
+  reason: MissReason | null;
+  updated_sessions: ScheduledSession[];
+  moved_sessions: ScheduleMove[];
+  skipped_sessions: ScheduledSession[];
+  merged_recovery_sessions: ScheduleMove[];
+  warnings: string[];
+  explanation: string;
+  recommendation: "apply" | "skip_and_resume" | "pause";
 }
 
 export interface TrainingSession {
