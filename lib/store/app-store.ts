@@ -34,6 +34,7 @@ import {
   generateScheduledSessions,
 } from "@/lib/training/schedule";
 import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
+import { applyMinBetweenSetRest } from "@/lib/training/rest";
 import {
   buildTrainingPause,
   detectPendingMissedSessions,
@@ -113,6 +114,8 @@ export interface AppState {
     actual: SetResult["actual"];
     startRest?: boolean;
   }) => void;
+  /** Start a countdown for a hold or timed (duration) set. */
+  startWorkTimer: (sessionItemId: string) => void;
   adjustRest: (deltaSec: number) => void;
   skipRest: () => void;
   clearTimer: () => void;
@@ -124,6 +127,8 @@ export interface AppState {
     },
   ) => { preview: string; explanation: string; eventId: string };
   skipExercise: (sessionItemId: string) => void;
+  /** Swap current exercise with the next pending one (do it after). */
+  deferExerciseAfterNext: (sessionItemId: string) => void;
   pauseSession: (sessionId: string) => void;
   resumeSession: (sessionId: string) => void;
   abandonSession: (sessionId: string) => void;
@@ -467,7 +472,9 @@ export const useAppStore = create<AppState>()(
         };
         const sets = item.prescription_snapshot.sets ?? 1;
         const isLast = setIndex >= sets;
-        const restSec = item.prescription_snapshot.rest_seconds ?? 0;
+        const restSec = applyMinBetweenSetRest(
+          item.prescription_snapshot.rest_seconds ?? 0,
+        );
         let activeTimer = get().activeTimer;
         let awaitingCompletion = get().awaitingCompletion;
         let sessionStatusPatch: Partial<TrainingSession> = {};
@@ -498,6 +505,39 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      startWorkTimer: (sessionItemId) => {
+        const item = get().sessionItems.find((i) => i.id === sessionItemId);
+        if (!item) return;
+        const p = item.prescription_snapshot;
+        const hold = p.hold_seconds;
+        const duration = p.duration_seconds;
+        let seconds = 0;
+        let kind: ActiveTimer["kind"] = "work";
+        if (hold != null && hold > 0 && p.reps_per_set == null) {
+          seconds = hold;
+          kind = "hold";
+        } else if (duration != null && duration > 0) {
+          seconds = duration;
+          kind = "work";
+        } else {
+          return;
+        }
+        set((s) => ({
+          activeTimer: {
+            session_id: item.training_session_id,
+            session_item_id: sessionItemId,
+            rest_started_at: new Date().toISOString(),
+            rest_duration_seconds: seconds,
+            kind,
+          },
+          trainingSessions: s.trainingSessions.map((t) =>
+            t.id === item.training_session_id && t.status === "resting"
+              ? { ...t, status: "active" }
+              : t,
+          ),
+        }));
+      },
+
       adjustRest: (deltaSec) => {
         const t = get().activeTimer;
         if (!t) return;
@@ -512,6 +552,8 @@ export const useAppStore = create<AppState>()(
       skipRest: () => {
         const t = get().activeTimer;
         if (!t) return;
+        // Clearing a work/hold timer cancels the countdown without logging the set.
+        // Clearing rest returns to active work.
         set((s) => ({
           activeTimer: null,
           trainingSessions: s.trainingSessions.map((sess) =>
@@ -706,6 +748,37 @@ export const useAppStore = create<AppState>()(
             return i;
           }),
           currentItemIndex: next ? idx + 1 : idx,
+        }));
+      },
+
+      deferExerciseAfterNext: (sessionItemId) => {
+        const item = get().sessionItems.find((i) => i.id === sessionItemId);
+        if (!item) return;
+        const sessionItems = get().sessionItems.filter(
+          (i) => i.training_session_id === item.training_session_id,
+        );
+        const ordered = [...sessionItems].sort((a, b) => a.sequence - b.sequence);
+        const idx = ordered.findIndex((i) => i.id === sessionItemId);
+        if (idx < 0) return;
+        const next = ordered.slice(idx + 1).find(
+          (i) => i.status === "pending" || i.status === "active",
+        );
+        if (!next) return;
+
+        const currentSeq = item.sequence;
+        const nextSeq = next.sequence;
+        set((s) => ({
+          awaitingCompletion: false,
+          activeTimer: null,
+          sessionItems: s.sessionItems.map((i) => {
+            if (i.id === sessionItemId) {
+              return { ...i, sequence: nextSeq, status: "pending" };
+            }
+            if (i.id === next.id) {
+              return { ...i, sequence: currentSeq, status: "active" };
+            }
+            return i;
+          }),
         }));
       },
 

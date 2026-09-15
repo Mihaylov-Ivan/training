@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { getExerciseBySlug } from "@/lib/seed/exercises";
 import { getRoutineById } from "@/lib/seed/routines";
 import { useAppStore } from "@/lib/store/app-store";
+import { estimateSessionDurationMin } from "@/lib/training/estimate-duration";
 import { formatPrescription } from "@/lib/utils";
+import type { Prescription } from "@/lib/types";
 import {
   Badge,
   Card,
@@ -30,12 +32,16 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
   const beginSession = useAppStore((s) => s.beginSession);
   const setOverviewSeen = useAppStore((s) => s.setOverviewSeen);
   const completeSet = useAppStore((s) => s.completeSet);
+  const startWorkTimer = useAppStore((s) => s.startWorkTimer);
   const skipExercise = useAppStore((s) => s.skipExercise);
+  const deferExerciseAfterNext = useAppStore((s) => s.deferExerciseAfterNext);
   const pauseSession = useAppStore((s) => s.pauseSession);
   const resumeSession = useAppStore((s) => s.resumeSession);
   const abandonSession = useAppStore((s) => s.abandonSession);
   const completeSession = useAppStore((s) => s.completeSession);
-  const submitExerciseCompletion = useAppStore((s) => s.submitExerciseCompletion);
+  const submitExerciseCompletion = useAppStore(
+    (s) => s.submitExerciseCompletion,
+  );
 
   const items = useMemo(
     () =>
@@ -66,11 +72,12 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
 
   const currentSetIndex = useMemo(() => {
     if (!current) return 1;
-    const done = setResults.filter((r) => r.session_item_id === current.id).length;
+    const done = setResults.filter(
+      (r) => r.session_item_id === current.id,
+    ).length;
     return done + 1;
   }, [current, setResults]);
 
-  // Reset local set UI when the active exercise changes (keyed remount pattern)
   const repsKey = `${current?.id ?? "none"}:${current?.prescription_snapshot.reps_per_set ?? ""}`;
   const [prevRepsKey, setPrevRepsKey] = useState(repsKey);
   if (prevRepsKey !== repsKey) {
@@ -93,12 +100,8 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
   const routine = getRoutineById(session.routine_template_id);
   const exercise = current ? getExerciseBySlug(current.exercise_slug) : null;
   const totalSets = current?.prescription_snapshot.sets ?? 1;
-  const allDone = items.every(
-    (i) =>
-      i.status === "completed" ||
-      i.status === "partial" ||
-      i.status === "skipped" ||
-      i.status === "pain_limited",
+  const allDone = items.every((i) =>
+    ["completed", "partial", "skipped", "pain_limited"].includes(i.status),
   );
 
   if (!session.overview_seen) {
@@ -110,14 +113,12 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
         </Badge>
         <h1 className="mt-3 text-3xl font-semibold">{routine?.name}</h1>
         <p className="mt-2 text-muted">
-          ~{routine?.default_duration_min} min · {items.length} exercises · Week{" "}
-          {session.cycle_week}
+          ~{estimateSessionDurationMin(items)} min est. · {items.length}{" "}
+          exercises · Week {session.cycle_week}
         </p>
         <Card className="mt-6">
           <p className="text-sm font-medium">Focus order</p>
-          <p className="mt-2 text-sm text-muted">
-            {routine?.description}
-          </p>
+          <p className="mt-2 text-sm text-muted">{routine?.description}</p>
           <ol className="mt-4 max-h-48 space-y-1 overflow-auto text-sm">
             {items.slice(0, 12).map((i) => (
               <li key={i.id}>
@@ -134,8 +135,8 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
           session.readiness_snapshot.back_pain_0_10 >= 4) ? (
           <Card className="mt-3 border-danger/40 bg-danger-soft/30">
             <p className="text-sm text-danger">
-              Pain noted on readiness check-in. Progress carefully; freeze progression if
-              pain ≥4/10.
+              Pain noted on readiness check-in. Progress carefully; freeze
+              progression if pain ≥4/10.
             </p>
           </Card>
         ) : null}
@@ -168,10 +169,27 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
     return <p className="p-6">No exercises.</p>;
   }
 
-  const resting =
-    activeTimer &&
-    activeTimer.session_id === sessionId &&
-    activeTimer.session_item_id === current.id;
+  const timerActive =
+    Boolean(activeTimer) &&
+    activeTimer!.session_id === sessionId &&
+    activeTimer!.session_item_id === current.id;
+
+  const timedWork = workTimerSpec(current.prescription_snapshot);
+
+  function logCompletedSet() {
+    completeSet({
+      sessionItemId: current!.id,
+      setIndex: currentSetIndex,
+      actual: {
+        reps: actualReps ?? undefined,
+        hold_seconds: current!.prescription_snapshot.hold_seconds ?? undefined,
+        load_kg: current!.prescription_snapshot.load_kg ?? undefined,
+        distance_m: current!.prescription_snapshot.distance_m ?? undefined,
+        duration_seconds:
+          current!.prescription_snapshot.duration_seconds ?? undefined,
+      },
+    });
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pb-8 pt-4">
@@ -217,8 +235,8 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
       </div>
 
       <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">
-        Exercise {items.findIndex((i) => i.id === current.id) + 1} of {items.length} ·{" "}
-        {current.block}
+        Exercise {items.findIndex((i) => i.id === current.id) + 1} of{" "}
+        {items.length} · {current.block}
       </p>
       <button
         className="mt-1 text-left text-2xl font-semibold leading-tight"
@@ -228,12 +246,25 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
       </button>
       <p className="mt-2 text-sm text-muted">
         {formatPrescription(current.prescription_snapshot)}
+        {current.prescription_snapshot.rest_seconds
+          ? ` · ${current.prescription_snapshot.rest_seconds}s rest`
+          : ""}
       </p>
+      {current.prescription_snapshot.per_side ? (
+        <p className="mt-1 text-sm font-medium text-accent">
+          Per side — do the full reps/hold on each leg or arm
+        </p>
+      ) : null}
 
-      {resting ? (
+      {timerActive ? (
         <RestTimer
           sound={profile?.timer_sound ?? true}
           haptics={profile?.timer_haptics ?? true}
+          onWorkComplete={
+            activeTimer!.kind === "hold" || activeTimer!.kind === "work"
+              ? logCompletedSet
+              : undefined
+          }
         />
       ) : awaitingCompletion ? (
         <CompletionPrompt
@@ -258,13 +289,17 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="mt-8 flex flex-1 flex-col">
           <p className="text-center text-sm text-muted">
             Set {Math.min(currentSetIndex, totalSets)} of {totalSets}
+            {timedWork
+              ? timedWork.kind === "hold"
+                ? " · Hold"
+                : " · Timed"
+              : ""}
           </p>
           <p className="mt-2 text-center text-6xl font-semibold tabular-nums tracking-tight">
             {current.prescription_snapshot.hold_seconds != null &&
             current.prescription_snapshot.reps_per_set == null
               ? `${current.prescription_snapshot.hold_seconds}s`
-              : current.prescription_snapshot.duration_seconds != null &&
-                  !current.prescription_snapshot.sets
+              : current.prescription_snapshot.duration_seconds != null
                 ? formatClock(current.prescription_snapshot.duration_seconds)
                 : current.prescription_snapshot.distance_m != null &&
                     !current.prescription_snapshot.reps_per_set
@@ -310,33 +345,54 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
             <Card className="mt-6 border-success/30 bg-success-soft/20">
               <p className="text-sm font-medium text-success">Next time</p>
               <p className="mt-1 text-sm">{lastPreview.preview}</p>
-              <p className="mt-1 text-xs text-muted">{lastPreview.explanation}</p>
+              <p className="mt-1 text-xs text-muted">
+                {lastPreview.explanation}
+              </p>
             </Card>
           ) : null}
 
           <div className="mt-auto space-y-3 pt-8">
-            <PrimaryButton
-              className="w-full"
-              disabled={session.status === "paused"}
-              onClick={() => {
-                completeSet({
-                  sessionItemId: current.id,
-                  setIndex: currentSetIndex,
-                  actual: {
-                    reps: actualReps ?? undefined,
-                    hold_seconds:
-                      current.prescription_snapshot.hold_seconds ?? undefined,
-                    load_kg: current.prescription_snapshot.load_kg ?? undefined,
-                    distance_m:
-                      current.prescription_snapshot.distance_m ?? undefined,
-                    duration_seconds:
-                      current.prescription_snapshot.duration_seconds ?? undefined,
-                  },
-                });
-              }}
-            >
-              Complete set
-            </PrimaryButton>
+            {timedWork ? (
+              <PrimaryButton
+                className="w-full"
+                disabled={session.status === "paused"}
+                onClick={() => startWorkTimer(current.id)}
+              >
+                {timedWork.kind === "hold"
+                  ? "Start hold timer"
+                  : "Start timer"}
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton
+                className="w-full"
+                disabled={session.status === "paused"}
+                onClick={logCompletedSet}
+              >
+                Complete set
+              </PrimaryButton>
+            )}
+            {timedWork ? (
+              <SecondaryButton
+                className="w-full"
+                disabled={session.status === "paused"}
+                onClick={logCompletedSet}
+              >
+                Complete set without timer
+              </SecondaryButton>
+            ) : null}
+            {items.some(
+              (i) =>
+                i.sequence > current.sequence &&
+                (i.status === "pending" || i.status === "active"),
+            ) ? (
+              <SecondaryButton
+                className="w-full"
+                disabled={session.status === "paused"}
+                onClick={() => deferExerciseAfterNext(current.id)}
+              >
+                Do after next exercise
+              </SecondaryButton>
+            ) : null}
             <SecondaryButton
               className="w-full"
               onClick={() => skipExercise(current.id)}
@@ -356,6 +412,18 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
       ) : null}
     </div>
   );
+}
+
+function workTimerSpec(
+  p: Prescription,
+): { seconds: number; kind: "hold" | "work" } | null {
+  if (p.hold_seconds != null && p.hold_seconds > 0 && p.reps_per_set == null) {
+    return { seconds: p.hold_seconds, kind: "hold" };
+  }
+  if (p.duration_seconds != null && p.duration_seconds > 0) {
+    return { seconds: p.duration_seconds, kind: "work" };
+  }
+  return null;
 }
 
 function formatClock(sec: number): string {

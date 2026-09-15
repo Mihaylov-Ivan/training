@@ -25,7 +25,7 @@ export default function RoutineDetailPage({
       </Link>
       <PageHeader
         title={routine.name}
-        subtitle={`${routine.default_duration_min} min · ${routine.items.length} exercises`}
+        subtitle={`~${routine.default_duration_min} min est. · ${routine.items.length} exercises`}
       />
       <p className="mb-4 text-sm text-muted">{routine.description}</p>
       <div className="space-y-2">

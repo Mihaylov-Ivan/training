@@ -47,17 +47,14 @@ export function formatPrescription(p: {
   protocol?: string;
 }): string {
   const parts: string[] = [];
+  const side = p.per_side ? " per side" : "";
   if (p.protocol) parts.push(`${p.protocol} protocol`);
   if (p.sets && p.reps_per_set != null) {
-    parts.push(
-      `${p.sets} × ${p.reps_per_set}${p.per_side ? "/side" : ""}`,
-    );
+    parts.push(`${p.sets} × ${p.reps_per_set}${side}`);
   } else if (p.sets && p.hold_seconds != null) {
-    parts.push(
-      `${p.sets} × ${p.hold_seconds}s${p.per_side ? "/side" : ""}`,
-    );
+    parts.push(`${p.sets} × ${p.hold_seconds}s${side}`);
   } else if (p.hold_seconds != null && !p.sets) {
-    parts.push(`${p.hold_seconds}s${p.per_side ? "/side" : ""}`);
+    parts.push(`${p.hold_seconds}s${side}`);
   }
   if (p.duration_seconds != null && p.duration_seconds > 0) {
     const m = Math.round(p.duration_seconds / 60);
