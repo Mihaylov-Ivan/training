@@ -230,7 +230,15 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
       </button>
       <p className="mt-2 text-sm text-muted">
         {formatPrescription(current.prescription_snapshot)}
+        {current.prescription_snapshot.rest_seconds
+          ? ` · ${current.prescription_snapshot.rest_seconds}s rest`
+          : ""}
       </p>
+      {current.prescription_snapshot.per_side ? (
+        <p className="mt-1 text-sm font-medium text-accent">
+          Per side — do the full reps/hold on each leg or arm
+        </p>
+      ) : null}
 
       {resting ? (
         <RestTimer
