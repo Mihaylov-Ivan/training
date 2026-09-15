@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getExerciseBySlug } from "@/lib/seed/exercises";
 import { getRoutineById } from "@/lib/seed/routines";
 import { useAppStore } from "@/lib/store/app-store";
+import { estimateSessionDurationMin } from "@/lib/training/estimate-duration";
 import { formatPrescription } from "@/lib/utils";
 import {
   Badge,
@@ -31,6 +32,7 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
   const setOverviewSeen = useAppStore((s) => s.setOverviewSeen);
   const completeSet = useAppStore((s) => s.completeSet);
   const skipExercise = useAppStore((s) => s.skipExercise);
+  const deferExerciseAfterNext = useAppStore((s) => s.deferExerciseAfterNext);
   const pauseSession = useAppStore((s) => s.pauseSession);
   const resumeSession = useAppStore((s) => s.resumeSession);
   const abandonSession = useAppStore((s) => s.abandonSession);
@@ -110,8 +112,8 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
         </Badge>
         <h1 className="mt-3 text-3xl font-semibold">{routine?.name}</h1>
         <p className="mt-2 text-muted">
-          ~{routine?.default_duration_min} min · {items.length} exercises · Week{" "}
-          {session.cycle_week}
+          ~{estimateSessionDurationMin(items)} min est. · {items.length}{" "}
+          exercises · Week {session.cycle_week}
         </p>
         <Card className="mt-6">
           <p className="text-sm font-medium">Focus order</p>
@@ -337,6 +339,19 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
             >
               Complete set
             </PrimaryButton>
+            {items.some(
+              (i) =>
+                i.sequence > current.sequence &&
+                (i.status === "pending" || i.status === "active"),
+            ) ? (
+              <SecondaryButton
+                className="w-full"
+                disabled={session.status === "paused"}
+                onClick={() => deferExerciseAfterNext(current.id)}
+              >
+                Do after next exercise
+              </SecondaryButton>
+            ) : null}
             <SecondaryButton
               className="w-full"
               onClick={() => skipExercise(current.id)}

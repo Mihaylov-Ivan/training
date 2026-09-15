@@ -8,6 +8,7 @@ import type {
 } from "@/lib/types";
 import { getExerciseBySlug } from "@/lib/seed/exercises";
 import { applyDeloadToPrescription, resolvePlancheHolds } from "@/lib/training/deload";
+import { applyIntensityRestToPrescription } from "@/lib/training/intensity-rest";
 import { clone, uid } from "@/lib/utils";
 
 function findState(
@@ -176,7 +177,10 @@ export function resolvePrescription(
   }
 
   p = applyDeloadToPrescription(item, p, cycleWeek);
-  p.rest_seconds = p.rest_seconds ?? item.rest_seconds;
+  p = applyIntensityRestToPrescription(item, {
+    ...p,
+    rest_seconds: p.rest_seconds ?? item.rest_seconds,
+  });
 
   return {
     prescription: p,
