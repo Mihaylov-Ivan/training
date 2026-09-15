@@ -373,9 +373,12 @@ export interface WellbeingCheckin {
 export interface ActiveTimer {
   session_id: string;
   session_item_id: string;
+  /** ISO timestamp when the countdown started (rest or work). */
   rest_started_at: string;
+  /** Countdown length in seconds (rest or work). */
   rest_duration_seconds: number;
-  kind: "rest" | "hold";
+  /** rest = between sets; hold = isometric hold; work = timed duration bout */
+  kind: "rest" | "hold" | "work";
 }
 
 export interface OfflineMutation {

@@ -114,6 +114,8 @@ export interface AppState {
     actual: SetResult["actual"];
     startRest?: boolean;
   }) => void;
+  /** Start a countdown for a hold or timed (duration) set. */
+  startWorkTimer: (sessionItemId: string) => void;
   adjustRest: (deltaSec: number) => void;
   skipRest: () => void;
   clearTimer: () => void;
@@ -503,6 +505,39 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      startWorkTimer: (sessionItemId) => {
+        const item = get().sessionItems.find((i) => i.id === sessionItemId);
+        if (!item) return;
+        const p = item.prescription_snapshot;
+        const hold = p.hold_seconds;
+        const duration = p.duration_seconds;
+        let seconds = 0;
+        let kind: ActiveTimer["kind"] = "work";
+        if (hold != null && hold > 0 && p.reps_per_set == null) {
+          seconds = hold;
+          kind = "hold";
+        } else if (duration != null && duration > 0) {
+          seconds = duration;
+          kind = "work";
+        } else {
+          return;
+        }
+        set((s) => ({
+          activeTimer: {
+            session_id: item.training_session_id,
+            session_item_id: sessionItemId,
+            rest_started_at: new Date().toISOString(),
+            rest_duration_seconds: seconds,
+            kind,
+          },
+          trainingSessions: s.trainingSessions.map((t) =>
+            t.id === item.training_session_id && t.status === "resting"
+              ? { ...t, status: "active" }
+              : t,
+          ),
+        }));
+      },
+
       adjustRest: (deltaSec) => {
         const t = get().activeTimer;
         if (!t) return;
@@ -517,6 +552,8 @@ export const useAppStore = create<AppState>()(
       skipRest: () => {
         const t = get().activeTimer;
         if (!t) return;
+        // Clearing a work/hold timer cancels the countdown without logging the set.
+        // Clearing rest returns to active work.
         set((s) => ({
           activeTimer: null,
           trainingSessions: s.trainingSessions.map((sess) =>
