@@ -32,6 +32,8 @@ export default function ProgressPage() {
   const oahs = states.find((s) => s.scope_id === "oahs");
   const planche = states.find((s) => s.scope_id === "planche");
   const flag = states.find((s) => s.scope_id === "human_flag");
+  const frontLever = states.find((s) => s.scope_id === "front_lever");
+  const backLever = states.find((s) => s.scope_id === "back_lever");
   const wpu = states.find((s) => s.scope_id === "weighted-pull-up");
   const front = states.find((s) => s.scope_id === "front_split");
   const middle = states.find((s) => s.scope_id === "middle_split");
@@ -121,6 +123,22 @@ export default function ProgressPage() {
           lines={[
             `Level: ${String(flag?.state.level ?? "—").replace(/_/g, " ")}`,
             `Mon/Sat: ${flag?.state.monday_hold_seconds ?? "—"}s / ${flag?.state.saturday_hold_seconds ?? "—"}s`,
+          ]}
+        />
+        <SkillCard
+          title="Front lever"
+          href="/progress/front-lever-hold"
+          lines={[
+            `Level: ${String(frontLever?.state.level ?? "—").replace(/_/g, " ")}`,
+            `Progress credits: ${frontLever?.state.success_credits ?? 0}/3`,
+          ]}
+        />
+        <SkillCard
+          title="Back lever"
+          href="/progress/back-lever-hold"
+          lines={[
+            `Level: ${String(backLever?.state.level ?? "—").replace(/_/g, " ")}`,
+            `Progress credits: ${backLever?.state.success_credits ?? 0}/3`,
           ]}
         />
       </div>
