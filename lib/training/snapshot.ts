@@ -20,6 +20,8 @@ function findState(
       "oahs-practice": "oahs",
       "planche-hold": "planche",
       "one-leg-human-flag": "human_flag",
+      "front-lever-hold": "front_lever",
+      "back-lever-hold": "back_lever",
       "front-split": "front_split",
       "middle-split": "middle_split",
     };
@@ -103,6 +105,13 @@ export function resolvePrescription(
       p.exercise_level = (state.current_level ?? state.state.level) as string;
       p.extras = { ...p.extras, flag_context: ctx };
     }
+    if (
+      item.exercise_slug === "front-lever-hold" ||
+      item.exercise_slug === "back-lever-hold"
+    ) {
+      p.exercise_level = (state.current_level ?? state.state.level ?? "tuck") as string;
+      p.notes = `${item.exercise_slug === "front-lever-hold" ? "Front" : "Back"} lever @ ${String(p.exercise_level).replace(/_/g, " ")} · quality holds`;
+    }
     if (item.exercise_slug === "front-split") {
       p.extras = {
         ...p.extras,
@@ -126,7 +135,7 @@ export function resolvePrescription(
           "push-up",
           "walking-lunge",
           "dragon-flag",
-          "single-leg-glute-bridge",
+          "single-leg-rdl",
           "single-leg-calf-raise",
           "tibialis-wall-raise",
           "hanging-straight-leg-raise",
@@ -148,6 +157,24 @@ export function resolvePrescription(
       };
       p.reps_per_set = Number(state.state.burpees ?? p.reps_per_set);
       p.rest_seconds = Number(state.state.round_rest ?? p.rest_seconds);
+    }
+    if (item.exercise_slug === "strong-easy-intervals") {
+      const rounds = Number(state.state.rounds ?? 6);
+      const strongSec = Number(state.state.strong_sec ?? 120);
+      const easySec = Number(state.state.easy_sec ?? 120);
+      p.sets = rounds;
+      p.duration_seconds = strongSec;
+      p.rest_seconds = easySec;
+      p.notes = `${rounds} strong reps: ${Math.floor(strongSec / 60)}:${String(strongSec % 60).padStart(2, "0")} strong @ RPE 7–8/10 + ${Math.floor(easySec / 60)}:${String(easySec % 60).padStart(2, "0")} easy jog between reps`;
+      p.extras = {
+        ...p.extras,
+        intervals: rounds,
+        strong_sec: strongSec,
+        easy_sec: easySec,
+        strong_rpe: "7–8/10",
+        easy_rpe: "2–3/10",
+        rest_label: "Easy jog",
+      };
     }
     if (item.exercise_slug === "steady-continuous-run" && typeof state.state.duration_sec === "number") {
       p.duration_seconds = state.state.duration_sec as number;
