@@ -7,6 +7,7 @@ import type {
   ExerciseResult,
   MissOutcome,
   MissReason,
+  SkipExerciseReason,
   OfflineMutation,
   OnboardingDraft,
   Profile,
@@ -35,6 +36,11 @@ import {
 } from "@/lib/training/schedule";
 import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
 import { applyMinBetweenSetRest } from "@/lib/training/rest";
+import {
+  buildExerciseSubstitution,
+  transitionRestSeconds,
+  WORK_TIMER_PREP_SECONDS,
+} from "@/lib/training/session-transitions";
 import {
   buildTrainingPause,
   detectPendingMissedSessions,
@@ -65,6 +71,24 @@ import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 function currentUserId(get: () => AppState): string {
   return get().authUserId ?? get().profile?.user_id ?? LOCAL_USER_ID;
+}
+
+function mergeById<T extends { id: string }>(cloud: T[], local: T[]): T[] {
+  const merged = new Map<string, T>();
+  for (const row of cloud) merged.set(row.id, row);
+  for (const row of local) merged.set(row.id, row);
+  return [...merged.values()];
+}
+
+function mergeByKey<T>(
+  cloud: T[],
+  local: T[],
+  key: (row: T) => string,
+): T[] {
+  const merged = new Map<string, T>();
+  for (const row of cloud) merged.set(key(row), row);
+  for (const row of local) merged.set(key(row), row);
+  return [...merged.values()];
 }
 
 export interface AppState {
@@ -126,7 +150,10 @@ export interface AppState {
       ruleCode?: string;
     },
   ) => { preview: string; explanation: string; eventId: string };
-  skipExercise: (sessionItemId: string) => void;
+  skipExercise: (
+    sessionItemId: string,
+    reason: SkipExerciseReason,
+  ) => { replaced: boolean; replacementName?: string };
   /** Swap current exercise with the next pending one (do it after). */
   deferExerciseAfterNext: (sessionItemId: string) => void;
   pauseSession: (sessionId: string) => void;
@@ -204,20 +231,66 @@ export const useAppStore = create<AppState>()(
 
       hydrateFromCloud: (snapshot: CloudSnapshot) => {
         if (!snapshot.profile) return;
+        const local = get();
+        const sameUser =
+          local.profile?.user_id === snapshot.profile.user_id ||
+          local.authUserId === snapshot.profile.user_id;
+
+        // A new device/account can bootstrap from cloud. Once the same user has
+        // local state, local rows are authoritative so an older cloud snapshot
+        // can never visually roll back an input that has not uploaded yet.
+        if (!sameUser || !local.profile?.onboarding_complete) {
+          set({
+            profile: snapshot.profile,
+            schedulePrefs: snapshot.schedulePrefs,
+            cycles: snapshot.cycles,
+            scheduledSessions: normalizeScheduledSessions(
+              snapshot.scheduledSessions,
+            ),
+            trainingSessions: snapshot.trainingSessions,
+            sessionItems: snapshot.sessionItems,
+            setResults: snapshot.setResults,
+            exerciseResults: snapshot.exerciseResults,
+            progressionStates: snapshot.progressionStates,
+            progressionEvents: snapshot.progressionEvents,
+            wellbeingCheckins: snapshot.wellbeingCheckins,
+            cloudSyncError: null,
+            authUserId: snapshot.profile.user_id,
+          });
+          return;
+        }
+
         set({
-          profile: snapshot.profile,
-          schedulePrefs: snapshot.schedulePrefs,
-          cycles: snapshot.cycles,
+          profile: local.profile,
+          schedulePrefs: local.schedulePrefs ?? snapshot.schedulePrefs,
+          cycles: mergeById(snapshot.cycles, local.cycles),
           scheduledSessions: normalizeScheduledSessions(
-            snapshot.scheduledSessions,
+            mergeById(snapshot.scheduledSessions, local.scheduledSessions),
           ),
-          trainingSessions: snapshot.trainingSessions,
-          sessionItems: snapshot.sessionItems,
-          setResults: snapshot.setResults,
-          exerciseResults: snapshot.exerciseResults,
-          progressionStates: snapshot.progressionStates,
-          progressionEvents: snapshot.progressionEvents,
-          wellbeingCheckins: snapshot.wellbeingCheckins,
+          trainingSessions: mergeById(
+            snapshot.trainingSessions,
+            local.trainingSessions,
+          ),
+          sessionItems: mergeById(snapshot.sessionItems, local.sessionItems),
+          setResults: mergeById(snapshot.setResults, local.setResults),
+          exerciseResults: mergeById(
+            snapshot.exerciseResults,
+            local.exerciseResults,
+          ),
+          progressionStates: mergeByKey(
+            snapshot.progressionStates,
+            local.progressionStates,
+            (row) => `${row.scope_type}:${row.scope_id}`,
+          ),
+          progressionEvents: mergeById(
+            snapshot.progressionEvents,
+            local.progressionEvents,
+          ),
+          wellbeingCheckins: mergeByKey(
+            snapshot.wellbeingCheckins,
+            local.wellbeingCheckins,
+            (row) => row.date,
+          ),
           cloudSyncError: null,
           authUserId: snapshot.profile.user_id,
         });
@@ -459,6 +532,7 @@ export const useAppStore = create<AppState>()(
       completeSet: ({ sessionItemId, setIndex, actual, startRest }) => {
         const item = get().sessionItems.find((i) => i.id === sessionItemId);
         if (!item) return;
+
         const result: SetResult = {
           id: uid("set"),
           session_item_id: sessionItemId,
@@ -470,37 +544,64 @@ export const useAppStore = create<AppState>()(
           success: true,
           note: "",
         };
+
         const sets = item.prescription_snapshot.sets ?? 1;
-        const isLast = setIndex >= sets;
+        const perSide = item.prescription_snapshot.per_side === true;
+        const existingForSet = get().setResults.filter(
+          (row) =>
+            row.session_item_id === sessionItemId &&
+            row.set_index === setIndex,
+        );
+        const sides = new Set(
+          existingForSet
+            .map((row) => row.actual.side)
+            .filter((side): side is "left" | "right" | "both" => Boolean(side)),
+        );
+        if (actual.side) sides.add(actual.side);
+        const logicalSetComplete =
+          !perSide ||
+          sides.has("both") ||
+          (sides.has("left") && sides.has("right"));
+        const isLast = setIndex >= sets && logicalSetComplete;
         const restSec = applyMinBetweenSetRest(
           item.prescription_snapshot.rest_seconds ?? 0,
         );
+
         let activeTimer = get().activeTimer;
         let awaitingCompletion = get().awaitingCompletion;
         let sessionStatusPatch: Partial<TrainingSession> = {};
 
-        if (!isLast && startRest !== false && restSec > 0) {
+        if (!logicalSetComplete) {
+          activeTimer = null;
+          awaitingCompletion = false;
+          sessionStatusPatch = { status: "active" };
+        } else if (!isLast && startRest !== false && restSec > 0) {
           activeTimer = {
             session_id: item.training_session_id,
             session_item_id: sessionItemId,
             rest_started_at: new Date().toISOString(),
             rest_duration_seconds: restSec,
+            rest_label:
+              typeof item.prescription_snapshot.extras?.rest_label === "string"
+                ? String(item.prescription_snapshot.extras.rest_label)
+                : undefined,
             kind: "rest",
           };
           sessionStatusPatch = { status: "resting" };
         } else if (isLast) {
           activeTimer = null;
           awaitingCompletion = true;
+          sessionStatusPatch = { status: "active" };
         }
 
-        set((s) => ({
-          setResults: [...s.setResults, result],
+        set((state) => ({
+          setResults: [...state.setResults, result],
           activeTimer,
           awaitingCompletion,
-          trainingSessions: s.trainingSessions.map((t) =>
-            t.id === item.training_session_id
-              ? { ...t, ...sessionStatusPatch, status: (sessionStatusPatch.status as TrainingSession["status"]) ?? (t.status === "resting" ? "active" : t.status) }
-              : t,
+          trainingSessions: state.trainingSessions.map((training) =>
+            training.id === item.training_session_id
+              ? { ...training, ...sessionStatusPatch }
+              : training,
           ),
         }));
       },
@@ -528,6 +629,7 @@ export const useAppStore = create<AppState>()(
             session_item_id: sessionItemId,
             rest_started_at: new Date().toISOString(),
             rest_duration_seconds: seconds,
+            prep_seconds: WORK_TIMER_PREP_SECONDS,
             kind,
           },
           trainingSessions: s.trainingSessions.map((t) =>
@@ -571,7 +673,10 @@ export const useAppStore = create<AppState>()(
         if (!t) return;
         const elapsed =
           (Date.now() - new Date(t.rest_started_at).getTime()) / 1000;
-        if (elapsed >= t.rest_duration_seconds) {
+        if (
+          elapsed >=
+          t.rest_duration_seconds + (t.prep_seconds ?? 0)
+        ) {
           // leave timer for UI to show "Start next set"; don't auto-clear
         }
       },
@@ -589,6 +694,8 @@ export const useAppStore = create<AppState>()(
                 "oahs-practice": "oahs",
                 "planche-hold": "planche",
                 "one-leg-human-flag": "human_flag",
+                "front-lever-hold": "front_lever",
+                "back-lever-hold": "back_lever",
                 "front-split": "front_split",
                 "middle-split": "middle_split",
               }[item.exercise_slug] ?? item.exercise_slug)
@@ -633,6 +740,8 @@ export const useAppStore = create<AppState>()(
           metrics: {
             ...input.metrics,
             protocol: item.prescription_snapshot.protocol,
+            lever_protocol:
+              item.prescription_snapshot.extras?.lever_protocol,
           },
           flagContext:
             item.prescription_snapshot.extras?.flag_context === "saturday"
@@ -658,6 +767,9 @@ export const useAppStore = create<AppState>()(
         const sorted = [...items].sort((a, b) => a.sequence - b.sequence);
         const idx = sorted.findIndex((i) => i.id === item.id);
         const next = sorted[idx + 1];
+        const transitionSeconds = next
+          ? transitionRestSeconds(item, next)
+          : 0;
 
         set((s) => ({
           exerciseResults: [
@@ -671,7 +783,33 @@ export const useAppStore = create<AppState>()(
             : [...s.progressionStates, result.state],
           progressionEvents: [...s.progressionEvents, result.event],
           awaitingCompletion: false,
-          activeTimer: null,
+          activeTimer:
+            next && transitionSeconds > 0
+              ? {
+                  session_id: item.training_session_id,
+                  session_item_id: next.id,
+                  rest_started_at: new Date().toISOString(),
+                  rest_duration_seconds: transitionSeconds,
+                  rest_label:
+                    item.block === "warmup" && next.block === "skill"
+                      ? "Pre-skill recovery"
+                      : item.block === "skill" && next.block === "skill"
+                        ? "Skill recovery"
+                        : "Exercise recovery",
+                  kind: "rest" as const,
+                }
+              : null,
+          trainingSessions: s.trainingSessions.map((training) =>
+            training.id === item.training_session_id
+              ? {
+                  ...training,
+                  status:
+                    next && transitionSeconds > 0
+                      ? ("resting" as const)
+                      : ("active" as const),
+                }
+              : training,
+          ),
           sessionItems: s.sessionItems.map((i) => {
             if (i.id === item.id) {
               return {
@@ -731,24 +869,119 @@ export const useAppStore = create<AppState>()(
         };
       },
 
-      skipExercise: (sessionItemId) => {
+      skipExercise: (sessionItemId, reason) => {
         const item = get().sessionItems.find((i) => i.id === sessionItemId);
-        if (!item) return;
+        if (!item) return { replaced: false };
+
+        if (reason === "cannot_do") {
+          const replacement = buildExerciseSubstitution(item);
+          if (replacement) {
+            set((state) => ({
+              awaitingCompletion: false,
+              activeTimer: null,
+              setResults: state.setResults.filter(
+                (row) => row.session_item_id !== sessionItemId,
+              ),
+              sessionItems: state.sessionItems.map((row) =>
+                row.id === sessionItemId
+                  ? {
+                      ...row,
+                      ...replacement,
+                      progression_rule_code: null,
+                      progression_scope: null,
+                      progression_state_snapshot: null,
+                      status: "active" as const,
+                    }
+                  : row,
+              ),
+            }));
+
+            const session = get().trainingSessions.find(
+              (training) => training.id === item.training_session_id,
+            );
+            const latestItems = get().sessionItems.filter(
+              (row) => row.training_session_id === item.training_session_id,
+            );
+            if (session) {
+              queueOrSync(() =>
+                syncTrainingSessionBundle({
+                  session,
+                  items: latestItems,
+                  setResults: get().setResults.filter((setResult) =>
+                    latestItems.some((row) => row.id === setResult.session_item_id),
+                  ),
+                }),
+              );
+            }
+            return {
+              replaced: true,
+              replacementName: replacement.exercise_name,
+            };
+          }
+        }
+
         const items = get()
-          .sessionItems.filter((i) => i.training_session_id === item.training_session_id)
+          .sessionItems.filter(
+            (row) => row.training_session_id === item.training_session_id,
+          )
           .sort((a, b) => a.sequence - b.sequence);
-        const idx = items.findIndex((i) => i.id === sessionItemId);
+        const idx = items.findIndex((row) => row.id === sessionItemId);
         const next = items[idx + 1];
-        set((s) => ({
+        const restSeconds = next
+          ? Math.max(15, transitionRestSeconds(item, next))
+          : 0;
+
+        set((state) => ({
           awaitingCompletion: false,
-          activeTimer: null,
-          sessionItems: s.sessionItems.map((i) => {
-            if (i.id === sessionItemId) return { ...i, status: "skipped" };
-            if (next && i.id === next.id) return { ...i, status: "active" };
-            return i;
+          activeTimer:
+            next && restSeconds > 0
+              ? {
+                  session_id: item.training_session_id,
+                  session_item_id: next.id,
+                  rest_started_at: new Date().toISOString(),
+                  rest_duration_seconds: restSeconds,
+                  rest_label: "Exercise recovery",
+                  kind: "rest" as const,
+                }
+              : null,
+          trainingSessions: state.trainingSessions.map((training) =>
+            training.id === item.training_session_id
+              ? {
+                  ...training,
+                  status:
+                    next && restSeconds > 0
+                      ? ("resting" as const)
+                      : ("active" as const),
+                }
+              : training,
+          ),
+          sessionItems: state.sessionItems.map((row) => {
+            if (row.id === sessionItemId) return { ...row, status: "skipped" };
+            if (next && row.id === next.id) return { ...row, status: "active" };
+            return row;
           }),
           currentItemIndex: next ? idx + 1 : idx,
         }));
+
+        const session = get().trainingSessions.find(
+          (training) => training.id === item.training_session_id,
+        );
+        const latestItems = get().sessionItems.filter(
+          (row) => row.training_session_id === item.training_session_id,
+        );
+        if (session) {
+          queueOrSync(() =>
+            syncTrainingSessionBundle({
+              session,
+              items: latestItems,
+              setResults: get().setResults.filter((setResult) =>
+                latestItems.some((row) => row.id === setResult.session_item_id),
+              ),
+            }),
+          );
+        }
+
+        return { replaced: false };
       },
 
       deferExerciseAfterNext: (sessionItemId) => {
@@ -1221,6 +1454,7 @@ export const useAppStore = create<AppState>()(
             cloudSyncError: null,
             lastSyncedAt: new Date().toISOString(),
             syncStatus: "idle",
+            offlineQueue: [],
           });
         } catch (e) {
           set({
