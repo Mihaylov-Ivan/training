@@ -65,11 +65,9 @@ function oahsItem(sequence: number): RoutineItemDef {
     prescription: {
       duration_seconds: 300,
       rest_seconds: 0,
-      notes: "5-min OAHS protocol; quality over fatigue",
+      notes: "5-min OAHS protocol after wrist warm-up; quality over fatigue",
       extras: {
         steps: [
-          { name: "Wrist rocks", detail: "10 forward + 10 lateral" },
-          { name: "Finger/palm lifts", detail: "10 reps" },
           { name: "Wall weight shifts", detail: "2 x 20 sec", rest: 20 },
           {
             name: "Fingertip-assisted OAHS",
@@ -78,7 +76,7 @@ function oahsItem(sequence: number): RoutineItemDef {
           },
           {
             name: "Free OAHS attempts",
-            detail: "2 attempts each arm, max 8 sec",
+            detail: "4 quality attempts each arm, max 8 sec",
             rest: 15,
           },
         ],
@@ -137,6 +135,31 @@ function flagItem(
     },
     rest_seconds: 60,
     progression_rule_code: "HUMAN_FLAG_V1",
+    progression_scope: "global_skill",
+  });
+}
+
+function leverItem(
+  sequence: number,
+  slug: "front-lever-hold" | "back-lever-hold",
+  protocol: "hard" | "light" = "hard",
+): RoutineItemDef {
+  const hard = protocol === "hard";
+  return item({
+    sequence,
+    exercise_slug: slug,
+    block: "skill",
+    prescription: {
+      sets: hard ? 3 : 2,
+      hold_seconds: hard ? 8 : 6,
+      exercise_level: "tuck",
+      rest_seconds: 60,
+      notes: hard ? "Quality straight-arm holds" : "Light technique holds",
+      extras: { lever_protocol: protocol },
+    },
+    rest_seconds: 60,
+    progression_rule_code:
+      slug === "front-lever-hold" ? "FRONT_LEVER_V1" : "BACK_LEVER_V1",
     progression_scope: "global_skill",
   });
 }
@@ -274,8 +297,10 @@ const mondayItems: RoutineItemDef[] = [
   oahsItem(9),
   plancheItem(10, "hard"),
   flagItem(11, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
+  leverItem(12, "front-lever-hold", "hard"),
+  leverItem(13, "back-lever-hold", "hard"),
   item({
-    sequence: 12,
+    sequence: 14,
     exercise_slug: "handstand-push-up",
     block: "strength",
     prescription: {
@@ -411,6 +436,24 @@ const mondayItems: RoutineItemDef[] = [
 resetSeq();
 const wednesdayBase: RoutineItemDef[] = [
   item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-push-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-pull-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 8, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
     exercise_slug: "easy-jog",
     block: "warmup",
     prescription: { duration_seconds: 120, rest_seconds: 0 },
@@ -435,12 +478,6 @@ const wednesdayBase: RoutineItemDef[] = [
     rest_seconds: 0,
   }),
   item({
-    exercise_slug: "ankle-pogo-hop",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 20, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
     exercise_slug: "high-knees",
     block: "warmup",
     prescription: { duration_seconds: 20, rest_seconds: 0 },
@@ -455,15 +492,8 @@ const wednesdayBase: RoutineItemDef[] = [
   oahsItem(8),
   plancheItem(9, "medium"),
   flagItem(10, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
-  item({
-    sequence: 11,
-    exercise_slug: "pogo-jump",
-    block: "power",
-    prescription: { sets: 3, reps_per_set: 12, rest_seconds: 45 },
-    rest_seconds: 45,
-    progression_rule_code: "POGO_JUMP_V1",
-    progression_scope: "routine_item",
-  }),
+  leverItem(11, "front-lever-hold", "light"),
+  leverItem(12, "back-lever-hold", "light"),
   item({
     sequence: 12,
     exercise_slug: "20m-acceleration-sprint",
@@ -500,17 +530,20 @@ const wednesdayBase: RoutineItemDef[] = [
   }),
   item({
     sequence: 15,
-    exercise_slug: "single-leg-glute-bridge",
+    exercise_slug: "single-leg-rdl",
     block: "posterior",
     prescription: {
       sets: 3,
-      reps_per_set: 12,
+      reps_per_set: 8,
+      load_kg: 0,
       per_side: true,
-      rest_seconds: 60,
-      tempo: "2-sec top hold",
+      rest_seconds: 90,
+      tempo: "3-sec controlled eccentric",
+      notes: "Complete left and right before the set rest",
     },
-    rest_seconds: 60,
-    progression_rule_code: "GLUTE_BRIDGE_V1",
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "SINGLE_LEG_RDL_V1",
     progression_scope: "routine_item",
   }),
   item({
@@ -581,7 +614,7 @@ function withRun(
   const base = omitLower
     ? wednesdayBase.filter(
         (i) =>
-          i.exercise_slug !== "single-leg-glute-bridge" &&
+          i.exercise_slug !== "single-leg-rdl" &&
           i.exercise_slug !== "single-leg-calf-raise" &&
           i.exercise_slug !== "tibialis-wall-raise",
       )
@@ -594,12 +627,20 @@ function withRun(
       exercise_slug: "strong-easy-intervals",
       block: "run",
       prescription: {
-        duration_seconds: 1440,
-        rest_seconds: 0,
-        notes: "6 x (2 min strong + 2 min easy)",
-        extras: { intervals: 6, strong_sec: 120, easy_sec: 120 },
+        sets: 6,
+        duration_seconds: 120,
+        rest_seconds: 120,
+        notes: "6 strong reps: 2:00 strong @ RPE 7–8/10, then 2:00 easy jog @ RPE 2–3/10 between reps",
+        extras: {
+          intervals: 6,
+          strong_sec: 120,
+          easy_sec: 120,
+          strong_rpe: "7–8/10",
+          easy_rpe: "2–3/10",
+          rest_label: "Easy jog",
+        },
       },
-      rest_seconds: 0,
+      rest_seconds: 120,
       progression_rule_code: "RUN_INTERVALS_V1",
       progression_scope: "capability",
     }),
@@ -691,8 +732,10 @@ const saturdayItems: RoutineItemDef[] = [
     saturday: true,
     notes: "Saturday flag context",
   }),
+  leverItem(12, "front-lever-hold", "hard"),
+  leverItem(13, "back-lever-hold", "hard"),
   item({
-    sequence: 12,
+    sequence: 14,
     exercise_slug: "strict-muscle-up",
     block: "power",
     prescription: { sets: 4, reps_per_set: 3, load_kg: 0, rest_seconds: 90 },
@@ -842,9 +885,14 @@ const saturdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const tuesdayItems: RoutineItemDef[] = [
+  item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
+    rest_seconds: 0,
+  }),
   oahsItem(1),
   plancheItem(2, "light"),
-  flagItem(3, { holdSeconds: 5, sets: 2, notes: "Light skill volume" }),
   item({
     sequence: 4,
     exercise_slug: "wall-slide",
@@ -900,9 +948,14 @@ const tuesdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const thursdayItems: RoutineItemDef[] = [
+  item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
+    rest_seconds: 0,
+  }),
   oahsItem(1),
   plancheItem(2, "light"),
-  flagItem(3, { holdSeconds: 5, sets: 2, notes: "Light skill volume" }),
   item({
     sequence: 4,
     exercise_slug: "cossack-squat",
@@ -974,9 +1027,14 @@ const thursdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const fridayItems: RoutineItemDef[] = [
+  item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
+    rest_seconds: 0,
+  }),
   oahsItem(1),
   plancheItem(2, "medium"),
-  flagItem(3, { holdSeconds: 5, sets: 2, notes: "Light skill volume" }),
   item({
     sequence: 4,
     exercise_slug: "chin-tuck",
@@ -1179,8 +1237,10 @@ const climbItems: RoutineItemDef[] = [
   oahsItem(6),
   plancheItem(7, "hard"),
   flagItem(8, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
+  leverItem(9, "front-lever-hold", "light"),
+  leverItem(10, "back-lever-hold", "light"),
   item({
-    sequence: 9,
+    sequence: 11,
     exercise_slug: "easy-climb-problems",
     block: "climb",
     prescription: { sets: 2, rest_seconds: 60, notes: "2 easy problems" },
@@ -1308,7 +1368,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Monday — Strength + Power",
     kind: "primary",
     description:
-      "Warmup → Flag → Planche → OAHS → HSPU → Muscle-up → Strength → Core → Splits",
+      "Wrist/upper warmup → OAHS → Planche → Flag → Front lever → Back lever → lower-body warmup → HSPU → Muscle-up → Strength → Core → Splits",
     day_roles: ["strength_power"],
     items: mondayItems,
   }),
@@ -1389,7 +1449,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Saturday — Calisthenics Volume + Work Capacity",
     kind: "primary",
     description:
-      "Warmup → Skills → Muscle-up → Volume (pull/push/dip) → Core → Conditioning → Flexibility",
+      "Wrist/upper warmup → OAHS → Planche → Flag → Front lever → Back lever → lower-body warmup → Muscle-up → Volume → Core → Conditioning → Flexibility",
     day_roles: ["calisthenics_volume"],
     items: saturdayItems,
   }),
