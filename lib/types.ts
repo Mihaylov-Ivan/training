@@ -429,6 +429,14 @@ export const PLANCHE_LEVELS = [
 
 export const FLAG_LEVELS = ["one_leg", "straddle", "full"] as const;
 
+export const LEVER_LEVELS = [
+  "tuck",
+  "advanced_tuck",
+  "one_leg",
+  "straddle",
+  "full",
+] as const;
+
 export const HSPU_LEVELS = [
   "wall",
   "freestanding",
