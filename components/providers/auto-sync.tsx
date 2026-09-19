@@ -2,81 +2,55 @@
 
 import { useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store/app-store";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
 
-const PUSH_MS = 45_000;
-const FULL_SYNC_MS = 120_000;
+const PUSH_MS = 30_000;
 
 /**
- * Keeps local Zustand state continuously reconciled with Supabase
- * while the user is online and onboarded.
+ * Local state is authoritative while the app is open.
+ * Background sync only pushes local changes; cloud pulls happen during
+ * bootstrap/manual sync and are merged local-first by the store.
  */
 export function AutoSync() {
-  const profile = useAppStore((s) => s.profile);
-  const authUserId = useAppStore((s) => s.authUserId);
-  const syncNow = useAppStore((s) => s.syncNow);
   const pushToCloud = useAppStore((s) => s.pushToCloud);
-  const pullFromCloud = useAppStore((s) => s.pullFromCloud);
-  const busy = useRef(false);
+  const running = useRef(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    if (!profile?.onboarding_complete || !authUserId) return;
+    let disposed = false;
 
-    let cancelled = false;
-
-    async function run(kind: "full" | "push") {
-      if (cancelled || busy.current) return;
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        useAppStore.setState({ syncStatus: "offline" });
-        return;
-      }
-      busy.current = true;
+    const push = async () => {
+      if (disposed || running.current) return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      running.current = true;
       try {
-        if (kind === "full") await syncNow();
-        else await pushToCloud();
+        await pushToCloud();
       } catch {
-        // errors recorded on store
+        // Store exposes sync failure without replacing local edits.
       } finally {
-        busy.current = false;
+        running.current = false;
       }
-    }
-
-    // Immediate reconcile after mount / auth
-    void run("full");
-
-    const pushTimer = window.setInterval(() => void run("push"), PUSH_MS);
-    const fullTimer = window.setInterval(() => void run("full"), FULL_SYNC_MS);
-
-    const onOnline = () => void run("full");
-    const onOffline = () =>
-      useAppStore.setState({ syncStatus: "offline" });
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void run("full");
     };
-    const onFocus = () => void run("push");
+
+    const initial = window.setTimeout(() => void push(), 1200);
+    const interval = window.setInterval(() => void push(), PUSH_MS);
+    const onOnline = () => void push();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void push();
+    };
+    const onFocus = () => void push();
 
     window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(pushTimer);
-      window.clearInterval(fullTimer);
+      disposed = true;
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
       window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [
-    profile?.onboarding_complete,
-    authUserId,
-    syncNow,
-    pushToCloud,
-    pullFromCloud,
-  ]);
+  }, [pushToCloud]);
 
   return null;
 }
