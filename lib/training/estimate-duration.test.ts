@@ -73,7 +73,7 @@ describe("intensity rest", () => {
 });
 
 describe("normalizeRoutineItemOrder", () => {
-  it("places skills after warmup as flag → planche → OAHS, then HSPU before muscle-up", () => {
+  it("places upper warmup first, then OAHS → planche → flag → levers, then lower warmup", () => {
     const items: RoutineItemDef[] = [
       {
         id: "1",
@@ -85,63 +85,63 @@ describe("normalizeRoutineItemOrder", () => {
       },
       {
         id: "2",
-        exercise_slug: "strict-muscle-up",
+        exercise_slug: "reverse-lunge",
         sequence: 2,
-        block: "power",
-        prescription: { sets: 4, reps_per_set: 3, rest_seconds: 90 },
-        rest_seconds: 90,
-      },
-      {
-        id: "3",
-        exercise_slug: "oahs-practice",
-        sequence: 3,
-        block: "skill",
-        prescription: { duration_seconds: 300, rest_seconds: 0 },
+        block: "warmup",
+        prescription: { sets: 1, reps_per_set: 8, per_side: true, rest_seconds: 0 },
         rest_seconds: 0,
       },
       {
-        id: "4",
-        exercise_slug: "handstand-push-up",
-        sequence: 4,
-        block: "strength",
-        prescription: { sets: 4, reps_per_set: 5, rest_seconds: 150 },
-        rest_seconds: 150,
-      },
-      {
-        id: "5",
+        id: "3",
         exercise_slug: "one-leg-human-flag",
-        sequence: 5,
+        sequence: 3,
         block: "skill",
         prescription: { sets: 3, hold_seconds: 6, rest_seconds: 60 },
         rest_seconds: 60,
       },
       {
+        id: "4",
+        exercise_slug: "back-lever-hold",
+        sequence: 4,
+        block: "skill",
+        prescription: { sets: 3, hold_seconds: 8, rest_seconds: 60 },
+        rest_seconds: 60,
+      },
+      {
+        id: "5",
+        exercise_slug: "oahs-practice",
+        sequence: 5,
+        block: "skill",
+        prescription: { duration_seconds: 300, rest_seconds: 0 },
+        rest_seconds: 0,
+      },
+      {
         id: "6",
-        exercise_slug: "planche-hold",
+        exercise_slug: "front-lever-hold",
         sequence: 6,
         block: "skill",
-        prescription: { duration_seconds: 300, rest_seconds: 40 },
-        rest_seconds: 40,
+        prescription: { sets: 3, hold_seconds: 8, rest_seconds: 60 },
+        rest_seconds: 60,
       },
       {
         id: "7",
-        exercise_slug: "push-up",
+        exercise_slug: "planche-hold",
         sequence: 7,
-        block: "volume",
-        prescription: { sets: 3, reps_per_set: 20, rest_seconds: 60 },
-        rest_seconds: 60,
+        block: "skill",
+        prescription: { duration_seconds: 300, rest_seconds: 40 },
+        rest_seconds: 40,
       },
     ];
 
     const ordered = normalizeRoutineItemOrder(items).map((i) => i.exercise_slug);
     expect(ordered).toEqual([
       "wrist-rocks",
-      "one-leg-human-flag",
-      "planche-hold",
       "oahs-practice",
-      "handstand-push-up",
-      "strict-muscle-up",
-      "push-up",
+      "planche-hold",
+      "one-leg-human-flag",
+      "front-lever-hold",
+      "back-lever-hold",
+      "reverse-lunge",
     ]);
   });
 });
@@ -177,16 +177,18 @@ describe("estimateRoutineDurationMin", () => {
     }
   });
 
-  it("monday places skills after warmup then HSPU before muscle-up", () => {
+  it("monday keeps skills fresh before lower-body warmup", () => {
     const mon = getRoutineById("routine-monday")!;
     const slugs = mon.items.map((i) => i.exercise_slug);
-    const warmupEnd = slugs.lastIndexOf("reverse-lunge");
-    expect(slugs.slice(warmupEnd + 1, warmupEnd + 6)).toEqual([
-      "one-leg-human-flag",
-      "planche-hold",
-      "oahs-practice",
-      "handstand-push-up",
-      "strict-muscle-up",
-    ]);
+    const order = [
+      slugs.indexOf("oahs-practice"),
+      slugs.indexOf("planche-hold"),
+      slugs.indexOf("one-leg-human-flag"),
+      slugs.indexOf("front-lever-hold"),
+      slugs.indexOf("back-lever-hold"),
+    ];
+    expect(slugs.indexOf("wrist-rocks")).toBeLessThan(order[0]!);
+    expect(order).toEqual([...order].sort((x, y) => x - y));
+    expect(order[4]!).toBeLessThan(slugs.indexOf("air-squat"));
   });
 });
