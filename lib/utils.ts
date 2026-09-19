@@ -234,7 +234,6 @@ export function createInitialProgressionStates(
       reps_per_set: 10,
       load_kg: 0,
     }),
-    base("pogo-jump", "routine_item", { success_credits: 0, level: 0 }),
     base("20m-acceleration-sprint", "routine_item", { best_sec: null }),
     base("5-10-5-shuttle", "routine_item", { best_sec: null }),
     base("pistol-squat", "routine_item", { load_kg: 0 }),
