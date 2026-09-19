@@ -31,6 +31,8 @@ export default function ExerciseProgressPage({
     "oahs-practice": "oahs",
     "planche-hold": "planche",
     "one-leg-human-flag": "human_flag",
+    "front-lever-hold": "front_lever",
+    "back-lever-hold": "back_lever",
     "front-split": "front_split",
     "middle-split": "middle_split",
   };
