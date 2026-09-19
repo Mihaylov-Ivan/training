@@ -160,6 +160,18 @@ export function createInitialProgressionStates(
       draft.flag_level,
     ),
     base(
+      "front_lever",
+      "global_skill",
+      { level: "tuck", success_credits: 0 },
+      "tuck",
+    ),
+    base(
+      "back_lever",
+      "global_skill",
+      { level: "tuck", success_credits: 0 },
+      "tuck",
+    ),
+    base(
       "front_split",
       "global_skill",
       {
@@ -222,9 +234,8 @@ export function createInitialProgressionStates(
     base("20m-acceleration-sprint", "routine_item", { best_sec: null }),
     base("5-10-5-shuttle", "routine_item", { best_sec: null }),
     base("pistol-squat", "routine_item", { load_kg: 0 }),
-    base("single-leg-glute-bridge", "routine_item", {
-      reps_per_set: 12,
-      elevated: false,
+    base("single-leg-rdl", "routine_item", {
+      load_kg: 0,
     }),
     base("copenhagen-plank", "routine_item", {
       hold_seconds: 20,
@@ -249,7 +260,7 @@ export function createInitialProgressionStates(
       burpees: 8,
       climbers: 20,
     }),
-    base("run_intervals", "capability", { pace_offset_sec_per_km: 0 }),
+    base("run_intervals", "capability", { rounds: 6, strong_sec: 120, easy_sec: 120, pace_offset_sec_per_km: 0 }),
     base("run_steady", "capability", {
       duration_sec: 1440,
       pace_offset_sec_per_km: 0,
