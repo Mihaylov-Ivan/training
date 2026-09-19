@@ -30,7 +30,7 @@ export function CompletionPrompt({
   const isClimb = item.exercise_slug === "climbing-quality-attempt";
 
   return (
-    <div className="mt-8 flex flex-1 flex-col">
+    <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-1">
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">
           Exercise complete
@@ -108,7 +108,7 @@ export function CompletionPrompt({
         ) : null}
       </Card>
 
-      <div className="mt-auto space-y-3 pt-6">
+      <div className="mt-auto space-y-2 pt-4">
         <PrimaryButton
           className="w-full"
           onClick={() =>
