@@ -314,6 +314,13 @@ export function evaluateProgression(
     case "BACK_LEVER_V1": {
       const label = input.ruleCode === "FRONT_LEVER_V1" ? "Front lever" : "Back lever";
       const level = String(state.state.level ?? state.current_level ?? "tuck");
+      const protocol = String(input.metrics?.lever_protocol ?? "hard");
+      if (protocol !== "hard") {
+        eventType = "hold";
+        explanation = `${label}: light technique exposure logged — only hard sessions earn progression credits.`;
+        preview = `Current level: ${level.replace(/_/g, " ")} · ${state.state.success_credits ?? 0}/3 hard-session credits`;
+        break;
+      }
       if (yes && (input.difficulty == null || input.difficulty <= 8)) {
         const credits = Number(state.state.success_credits ?? 0) + 1;
         state.state.success_credits = credits;
