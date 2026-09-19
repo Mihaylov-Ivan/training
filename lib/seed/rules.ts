@@ -29,6 +29,24 @@ export const PROGRESSION_RULES: ProgressionRuleDef[] = [
     scope: "global_skill",
   },
   {
+    id: "rule-front-lever",
+    code: "FRONT_LEVER_V1",
+    name: "Front lever progression",
+    version: 1,
+    description:
+      "Three clean successful sessions at the current progression advance one level; failed or maximal-quality sessions hold the level.",
+    scope: "global_skill",
+  },
+  {
+    id: "rule-back-lever",
+    code: "BACK_LEVER_V1",
+    name: "Back lever progression",
+    version: 1,
+    description:
+      "Three clean successful sessions at the current progression advance one level; failed or painful sessions hold the level.",
+    scope: "global_skill",
+  },
+  {
     id: "rule-front-split",
     code: "FRONT_SPLIT_V1",
     name: "Front split floor-gap progression",
@@ -158,6 +176,14 @@ export const PROGRESSION_RULES: ProgressionRuleDef[] = [
     scope: "routine_item",
   },
   {
+    id: "rule-single-leg-rdl",
+    code: "SINGLE_LEG_RDL_V1",
+    name: "Single-leg Romanian deadlift",
+    version: 1,
+    description: "Complete 3×8 cleanly on both legs: +2 kg next time. Failure holds load.",
+    scope: "routine_item",
+  },
+  {
     id: "rule-copenhagen",
     code: "COPENHAGEN_V1",
     name: "Copenhagen plank hold",
@@ -186,7 +212,7 @@ export const PROGRESSION_RULES: ProgressionRuleDef[] = [
     code: "RUN_INTERVALS_V1",
     name: "Week 1 interval pace",
     version: 1,
-    description: "If completed and difficulty ≤8, improve pace 5 sec/km next cycle.",
+    description: "Start 6×(2:00 strong, 2:00 easy). Successful sessions reduce easy recovery by 10s to 90s, then add rounds to 8, then improve strong pace by ~5 sec/km.",
     scope: "capability",
   },
   {
