@@ -68,6 +68,7 @@ describe("startWorkTimer", () => {
     expect(t).toMatchObject({
       session_item_id: "si-hold",
       rest_duration_seconds: 20,
+      prep_seconds: 5,
       kind: "hold",
     });
   });
@@ -78,6 +79,7 @@ describe("startWorkTimer", () => {
     expect(t).toMatchObject({
       session_item_id: "si-run",
       rest_duration_seconds: 120,
+      prep_seconds: 5,
       kind: "work",
     });
   });
