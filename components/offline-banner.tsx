@@ -23,42 +23,38 @@ export function OfflineBanner() {
 
   if (!profile?.onboarding_complete) return null;
 
+  const base =
+    "safe-top pointer-events-none fixed inset-x-0 top-0 z-[60] flex min-h-7 items-end justify-center px-3 pb-1 text-center text-xs font-medium";
+
   if (offline || syncStatus === "offline") {
     return (
-      <div
-        role="status"
-        className="bg-warning-soft px-4 py-2 text-center text-sm font-medium text-warning"
-      >
-        Offline — changes will sync when you reconnect
+      <div role="status" className={`${base} bg-warning-soft/95 text-warning`}>
+        Offline — changes stay on this device and sync when you reconnect
       </div>
     );
   }
 
   if (syncStatus === "error" || cloudSyncError) {
     return (
-      <div
-        role="status"
-        className="flex items-center justify-center gap-3 bg-danger-soft px-4 py-2 text-center text-sm font-medium text-danger"
-      >
-        <span>Sync issue{cloudSyncError ? `: ${cloudSyncError}` : ""}</span>
-        <button
-          type="button"
-          className="underline underline-offset-2"
-          onClick={() => void syncNow()}
-        >
-          Retry
-        </button>
+      <div role="status" className={`${base} bg-danger-soft/95 text-danger`}>
+        <span className="pointer-events-auto inline-flex items-center gap-2">
+          <span>Sync issue — local changes are safe</span>
+          <button
+            type="button"
+            className="font-semibold underline underline-offset-2"
+            onClick={() => void syncNow()}
+          >
+            Retry
+          </button>
+        </span>
       </div>
     );
   }
 
   if (syncStatus === "syncing") {
     return (
-      <div
-        role="status"
-        className="bg-accent-soft px-4 py-1.5 text-center text-xs font-medium text-accent"
-      >
-        Syncing with cloud…
+      <div role="status" className={`${base} bg-accent-soft/90 text-accent`}>
+        Syncing…
       </div>
     );
   }
