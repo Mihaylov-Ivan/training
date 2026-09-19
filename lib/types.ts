@@ -80,6 +80,8 @@ export type MissReason =
   | "intentional_rest"
   | "other";
 
+export type SkipExerciseReason = "cannot_do" | "skip";
+
 export type AdaptiveSessionKind =
   | "MAIN_WORKOUT"
   | "SKILL_PRACTICE"
@@ -379,6 +381,10 @@ export interface ActiveTimer {
   rest_duration_seconds: number;
   /** rest = between sets; hold = isometric hold; work = timed duration bout */
   kind: "rest" | "hold" | "work";
+  /** Countdown shown before hold/work begins so the athlete can get into position. */
+  prep_seconds?: number;
+  /** Optional activity label for recovery intervals, e.g. Easy jog. */
+  rest_label?: string;
 }
 
 export interface OfflineMutation {
