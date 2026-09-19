@@ -1,12 +1,27 @@
 import type { Block, RoutineItemDef } from "@/lib/types";
 
 const SKILL_SLUG_ORDER = [
-  "one-leg-human-flag",
-  "planche-hold",
   "oahs-practice",
+  "planche-hold",
+  "one-leg-human-flag",
+  "front-lever-hold",
+  "back-lever-hold",
 ] as const;
 
 const WARMUP_BLOCKS = new Set<Block>(["warmup", "maintenance"]);
+
+const POST_SKILL_WARMUP_SLUGS = new Set([
+  "easy-jog",
+  "leg-swings-front-back",
+  "leg-swings-lateral",
+  "walking-lunge",
+  "ankle-pogo-hop",
+  "high-knees",
+  "butt-kicks",
+  "air-squat",
+  "bodyweight-squat",
+  "reverse-lunge",
+]);
 
 function skillRank(slug: string): number {
   const idx = SKILL_SLUG_ORDER.indexOf(
@@ -23,18 +38,21 @@ function workTier(item: RoutineItemDef): number {
 
 /**
  * Session order:
- * 1. Warmup / maintenance
- * 2. Skills — flag → planche → OAHS
- * 3. Hard stability (HSPU) → other hard (muscle-up) → remaining work
- *
- * Relative order within each bucket is preserved.
+ * 1. Wrist / shoulder / upper-body preparation
+ * 2. Skills — OAHS → planche → human flag → front lever → back lever
+ * 3. Lower-body / cardio warm-up
+ * 4. Main strength, power, endurance and flexibility work
  */
 export function normalizeRoutineItemOrder(
   items: RoutineItemDef[],
 ): RoutineItemDef[] {
   const indexed = items.map((item, index) => ({ item, index }));
 
-  const warmup = indexed.filter((x) => WARMUP_BLOCKS.has(x.item.block));
+  const preSkillWarmup = indexed.filter(
+    (x) =>
+      WARMUP_BLOCKS.has(x.item.block) &&
+      !POST_SKILL_WARMUP_SLUGS.has(x.item.exercise_slug),
+  );
   const skills = indexed
     .filter((x) => x.item.block === "skill")
     .sort(
@@ -42,14 +60,21 @@ export function normalizeRoutineItemOrder(
         skillRank(a.item.exercise_slug) - skillRank(b.item.exercise_slug) ||
         a.index - b.index,
     );
+  const postSkillWarmup = indexed.filter(
+    (x) =>
+      WARMUP_BLOCKS.has(x.item.block) &&
+      POST_SKILL_WARMUP_SLUGS.has(x.item.exercise_slug),
+  );
   const rest = indexed
     .filter(
       (x) => !WARMUP_BLOCKS.has(x.item.block) && x.item.block !== "skill",
     )
     .sort((a, b) => workTier(a.item) - workTier(b.item) || a.index - b.index);
 
-  return [...warmup, ...skills, ...rest].map((x, i) => ({
-    ...x.item,
-    sequence: i + 1,
-  }));
+  return [...preSkillWarmup, ...skills, ...postSkillWarmup, ...rest].map(
+    (x, i) => ({
+      ...x.item,
+      sequence: i + 1,
+    }),
+  );
 }
