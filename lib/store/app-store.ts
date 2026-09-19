@@ -233,8 +233,7 @@ export const useAppStore = create<AppState>()(
         if (!snapshot.profile) return;
         const local = get();
         const sameUser =
-          local.profile?.user_id === snapshot.profile.user_id ||
-          local.authUserId === snapshot.profile.user_id;
+          local.profile?.user_id === snapshot.profile.user_id;
 
         // A new device/account can bootstrap from cloud. Once the same user has
         // local state, local rows are authoritative so an older cloud snapshot
