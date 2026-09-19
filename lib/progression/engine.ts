@@ -5,6 +5,7 @@ import {
   HSPU_LEVELS,
   OAHS_LEVELS,
   PLANCHE_LEVELS,
+  LEVER_LEVELS,
 } from "@/lib/types";
 
 export interface CompletionInput {
@@ -309,6 +310,84 @@ export function evaluateProgression(
       }
       break;
     }
+    case "FRONT_LEVER_V1":
+    case "BACK_LEVER_V1": {
+      const label = input.ruleCode === "FRONT_LEVER_V1" ? "Front lever" : "Back lever";
+      const level = String(state.state.level ?? state.current_level ?? "tuck");
+      if (yes && (input.difficulty == null || input.difficulty <= 8)) {
+        const credits = Number(state.state.success_credits ?? 0) + 1;
+        state.state.success_credits = credits;
+        if (credits >= 3) {
+          const next = advanceIn(LEVER_LEVELS, level);
+          state.state.level = next;
+          state.current_level = next;
+          state.state.success_credits = 0;
+          eventType = next === level ? "hold" : "advance";
+          explanation =
+            next === level
+              ? `${label}: full progression maintained — keep building clean hold quality.`
+              : `${label}: 3 clean successful sessions → advance to ${next.replace(/_/g, " ")}.`;
+          preview = `Next: 3 × 8s @ ${next.replace(/_/g, " ")}`;
+        } else {
+          eventType = "credit";
+          explanation = `${label} success — progression credit ${credits}/3.`;
+          preview = `Current level: ${level.replace(/_/g, " ")} · ${credits}/3 credits`;
+        }
+      } else {
+        state.state.success_credits = 0;
+        eventType = yes ? "hold" : "failure";
+        explanation = yes
+          ? `${label} completed at high effort — hold the current level until it is controlled.`
+          : `${label} incomplete — hold current level.`;
+        preview = `Next: same ${level.replace(/_/g, " ")} progression`;
+      }
+      break;
+    }
+    case "SINGLE_LEG_RDL_V1": {
+      const load = Number(state.state.load_kg ?? 0);
+      if (yes && (input.difficulty == null || input.difficulty <= 8)) {
+        state.state.load_kg = load + 2;
+        eventType = "success";
+        explanation = `Single-leg RDL complete with control → +${load + 2} kg next time.`;
+      } else {
+        eventType = yes ? "hold" : "failure";
+        explanation = "Single-leg RDL held at the same load until both sides are controlled.";
+      }
+      preview = `Next: 3 × 8/leg @ +${state.state.load_kg ?? load} kg`;
+      break;
+    }
+    case "RUN_INTERVALS_V1": {
+      const rounds = Number(state.state.rounds ?? 6);
+      const strongSec = Number(state.state.strong_sec ?? 120);
+      const easySec = Number(state.state.easy_sec ?? 120);
+      const paceOffset = Number(state.state.pace_offset_sec_per_km ?? 0);
+      if (yes && (input.difficulty == null || input.difficulty <= 8)) {
+        if (easySec > 90) {
+          state.state.easy_sec = easySec - 10;
+          eventType = "success";
+          explanation = `Intervals controlled → easy-jog recovery reduced to ${easySec - 10}s.`;
+        } else if (rounds < 8) {
+          state.state.rounds = rounds + 1;
+          eventType = "success";
+          explanation = `Intervals controlled at 90s recovery → add one strong repeat (${rounds + 1} total).`;
+        } else {
+          state.state.pace_offset_sec_per_km = paceOffset - 5;
+          eventType = "advance";
+          explanation = "8 repeats controlled → keep the structure and target about 5 sec/km faster on strong reps.";
+        }
+      } else {
+        eventType = yes ? "hold" : "failure";
+        explanation = yes
+          ? "Intervals completed but effort was high — repeat the same structure."
+          : "Intervals incomplete — repeat the same structure.";
+      }
+      preview = `Next: ${state.state.rounds ?? rounds} × (${strongSec}s strong + ${state.state.easy_sec ?? easySec}s easy jog)${
+        Number(state.state.pace_offset_sec_per_km ?? 0) < 0
+          ? ` · pace target ${Math.abs(Number(state.state.pace_offset_sec_per_km))} sec/km faster than baseline`
+          : ""
+      }`;
+      break;
+    }
     case "BULGARIAN_SPLIT_V1": {
       const load = Number(state.state.load_kg ?? 0);
       if (yes) {
@@ -466,7 +545,6 @@ export function evaluateProgression(
     case "SPRINT_20M_V1":
     case "SHUTTLE_5105_V1":
     case "BURPEE_CLIMBER_V1":
-    case "RUN_INTERVALS_V1":
     case "RUN_STEADY_V1":
     case "RUN_LONG_V1": {
       const r = applyGenericVolumeRule(input.ruleCode, state, yes, input);
