@@ -58,7 +58,11 @@ export function formatPrescription(p: {
   }
   if (p.duration_seconds != null && p.duration_seconds > 0) {
     const m = Math.round(p.duration_seconds / 60);
-    parts.push(m >= 1 && p.duration_seconds % 60 === 0 ? `${m} min` : `${p.duration_seconds}s`);
+    const duration =
+      m >= 1 && p.duration_seconds % 60 === 0
+        ? `${m} min`
+        : `${p.duration_seconds}s`;
+    parts.push(p.sets ? `${p.sets} × ${duration}` : duration);
   }
   if (p.distance_m != null) {
     parts.push(
