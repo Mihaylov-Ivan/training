@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getExerciseBySlug } from "@/lib/seed/exercises";
 import { getRoutineById } from "@/lib/seed/routines";
@@ -57,6 +57,8 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
     preview: string;
     explanation: string;
   } | null>(null);
+  const [skipPrompt, setSkipPrompt] = useState(false);
+  const [skipMessage, setSkipMessage] = useState<string | null>(null);
 
   const current = useMemo(
     () =>
@@ -70,21 +72,53 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
 
   useWakeLock(session?.status === "active" || session?.status === "resting");
 
-  const currentSetIndex = useMemo(() => {
-    if (!current) return 1;
-    const done = setResults.filter(
-      (r) => r.session_item_id === current.id,
-    ).length;
-    return done + 1;
+  const sideProgress = useMemo(() => {
+    if (!current) {
+      return { setIndex: 1, side: null as "left" | "right" | null };
+    }
+    const total = current.prescription_snapshot.sets ?? 1;
+    const rows = setResults.filter(
+      (row) => row.session_item_id === current.id,
+    );
+
+    if (!current.prescription_snapshot.per_side) {
+      return {
+        setIndex: Math.min(rows.length + 1, total),
+        side: null as "left" | "right" | null,
+      };
+    }
+
+    for (let setIndex = 1; setIndex <= total; setIndex++) {
+      const setRows = rows.filter((row) => row.set_index === setIndex);
+      const hasBoth = setRows.some(
+        (row) => row.actual.side === "both" || row.actual.side == null,
+      );
+      if (hasBoth) continue;
+      if (!setRows.some((row) => row.actual.side === "left")) {
+        return { setIndex, side: "left" as const };
+      }
+      if (!setRows.some((row) => row.actual.side === "right")) {
+        return { setIndex, side: "right" as const };
+      }
+    }
+
+    return { setIndex: total, side: "right" as const };
   }, [current, setResults]);
 
-  const repsKey = `${current?.id ?? "none"}:${current?.prescription_snapshot.reps_per_set ?? ""}`;
+  const currentSetIndex = sideProgress.setIndex;
+  const currentSide = sideProgress.side;
+  const repsKey = `${current?.id ?? "none"}:${currentSetIndex}:${currentSide ?? "both"}:${current?.prescription_snapshot.reps_per_set ?? ""}`;
   const [prevRepsKey, setPrevRepsKey] = useState(repsKey);
   if (prevRepsKey !== repsKey) {
     setPrevRepsKey(repsKey);
     setActualReps(current?.prescription_snapshot.reps_per_set ?? null);
     setLastPreview(null);
   }
+
+  useEffect(() => {
+    setSkipPrompt(false);
+    setSkipMessage(null);
+  }, [current?.id]);
 
   if (!session) {
     return (
@@ -187,13 +221,14 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
         distance_m: current!.prescription_snapshot.distance_m ?? undefined,
         duration_seconds:
           current!.prescription_snapshot.duration_seconds ?? undefined,
+        side: currentSide ?? "both",
       },
     });
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pb-8 pt-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className="safe-bottom safe-top mx-auto flex h-dvh w-full max-w-lg flex-col overflow-hidden px-4 pb-3 pt-2">
+      <div className="flex shrink-0 items-center justify-between gap-2">
         <button
           className="min-h-11 text-sm text-muted"
           onClick={() => {
@@ -250,9 +285,19 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
           ? ` · ${current.prescription_snapshot.rest_seconds}s rest`
           : ""}
       </p>
+      {current.prescription_snapshot.notes ? (
+        <p className="mt-1 text-sm leading-snug text-muted">
+          {current.prescription_snapshot.notes}
+        </p>
+      ) : null}
+      {skipMessage ? (
+        <p className="mt-2 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">
+          {skipMessage}
+        </p>
+      ) : null}
       {current.prescription_snapshot.per_side ? (
         <p className="mt-1 text-sm font-medium text-accent">
-          Per side — do the full reps/hold on each leg or arm
+          Each side is logged separately. Complete both sides before the set rest.
         </p>
       ) : null}
 
@@ -286,16 +331,19 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
           }}
         />
       ) : (
-        <div className="mt-8 flex flex-1 flex-col">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col">
           <p className="text-center text-sm text-muted">
             Set {Math.min(currentSetIndex, totalSets)} of {totalSets}
+            {currentSide
+              ? ` · ${currentSide === "left" ? "Left" : "Right"} side`
+              : ""}
             {timedWork
               ? timedWork.kind === "hold"
                 ? " · Hold"
                 : " · Timed"
               : ""}
           </p>
-          <p className="mt-2 text-center text-6xl font-semibold tabular-nums tracking-tight">
+          <p className="mt-2 text-center text-5xl font-semibold tabular-nums tracking-tight sm:text-6xl">
             {current.prescription_snapshot.hold_seconds != null &&
             current.prescription_snapshot.reps_per_set == null
               ? `${current.prescription_snapshot.hold_seconds}s`
@@ -351,7 +399,47 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
             </Card>
           ) : null}
 
-          <div className="mt-auto space-y-3 pt-8">
+          {skipPrompt ? (
+            <Card className="mt-auto border-warning/40">
+              <p className="text-sm font-semibold">Why are you skipping this exercise?</p>
+              <p className="mt-1 text-xs text-muted">
+                If you cannot perform it, the app will use a safe configured substitute when one is available. A normal skip simply moves on and does not count as a failed progression.
+              </p>
+              <div className="mt-4 space-y-2">
+                <PrimaryButton
+                  className="w-full"
+                  onClick={() => {
+                    const result = skipExercise(current.id, "cannot_do");
+                    setSkipPrompt(false);
+                    setSkipMessage(
+                      result.replaced && result.replacementName
+                        ? `Replaced with ${result.replacementName}.`
+                        : "No configured substitute was appropriate, so the exercise was skipped.",
+                    );
+                  }}
+                >
+                  I cannot do this exercise
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => {
+                    skipExercise(current.id, "skip");
+                    setSkipPrompt(false);
+                  }}
+                >
+                  Skip and move on
+                </SecondaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => setSkipPrompt(false)}
+                >
+                  Cancel
+                </SecondaryButton>
+              </div>
+            </Card>
+          ) : null}
+
+          <div className={`${skipPrompt ? "hidden" : ""} mt-auto space-y-2 pt-5`}>
             {timedWork ? (
               <PrimaryButton
                 className="w-full"
@@ -395,7 +483,7 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
             ) : null}
             <SecondaryButton
               className="w-full"
-              onClick={() => skipExercise(current.id)}
+              onClick={() => setSkipPrompt(true)}
             >
               Skip exercise
             </SecondaryButton>
