@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store/app-store";
+import { LOCAL_USER_ID } from "@/lib/types";
 import {
   createClient,
   isSupabaseConfigured,
@@ -56,6 +57,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ((cloud?.progressionStates?.length ?? 0) > 0 ||
             (cloud?.cycles?.length ?? 0) > 0 ||
             cloudOnboarded);
+
+        if (
+          cloudLooksSetup &&
+          cloud?.profile &&
+          local.profile?.onboarding_complete &&
+          local.profile.user_id === LOCAL_USER_ID
+        ) {
+          // Preserve genuine offline/guest work from this device before merging
+          // an existing cloud account. adoptAuthUser changes ids synchronously.
+          adoptAuthUser(userId);
+        }
 
         if (cloudLooksSetup && cloud?.profile) {
           const profile = cloudOnboarded
