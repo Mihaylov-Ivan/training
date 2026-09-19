@@ -177,7 +177,7 @@ export const EXERCISES: ExerciseDef[] = [
     category: "skill",
     metric_type: "skill_block",
     instructions:
-      "Five-minute one-arm handstand protocol: wrist rocks, finger lifts, wall weight shifts, fingertip-assisted holds, free attempts. Terminate when alignment deteriorates.",
+      "Five-minute one-arm handstand protocol after the separate wrist warm-up: wall weight shifts, fingertip-assisted holds and high-quality free attempts. Terminate when alignment deteriorates.",
     cues: [
       "Push tall through support shoulder",
       "Keep stacked line",
@@ -190,6 +190,18 @@ export const EXERCISES: ExerciseDef[] = [
     purpose: "One-arm handstand skill",
     progression_family: "oahs",
     pain_caution: "Stop if sharp wrist or shoulder pain appears.",
+  },
+  {
+    id: "ex-wall-handstand",
+    slug: "wall-handstand-hold",
+    name: "Wall handstand hold",
+    category: "skill",
+    metric_type: "hold",
+    instructions:
+      "Hold a chest-to-wall handstand with a long stacked line and active shoulders.",
+    cues: ["Push tall", "Ribs down", "Keep the line stacked"],
+    common_mistakes: ["Arching hard through the lower back or collapsing the shoulders"],
+    purpose: "OAHS-supporting handstand strength and line control",
   },
   {
     id: "ex-planche",
@@ -220,6 +232,33 @@ export const EXERCISES: ExerciseDef[] = [
     cues: ["Shoulders active", "Pelvis stacked", "Train both sides"],
     common_mistakes: ["Twisting chest or hanging passively on shoulder"],
     progression_family: "human_flag",
+  },
+  {
+    id: "ex-front-lever",
+    slug: "front-lever-hold",
+    name: "Front lever hold",
+    category: "skill",
+    metric_type: "hold",
+    instructions:
+      "Hold the current front-lever progression with straight elbows, depressed shoulders and a rigid hollow body.",
+    cues: ["Straight elbows", "Pull the bar toward the hips", "Keep ribs and pelvis locked"],
+    common_mistakes: ["Bent elbows", "Hips dropping", "Losing scapular control"],
+    purpose: "Front-lever straight-arm pulling strength",
+    progression_family: "front_lever",
+  },
+  {
+    id: "ex-back-lever",
+    slug: "back-lever-hold",
+    name: "Back lever hold",
+    category: "skill",
+    metric_type: "hold",
+    instructions:
+      "Hold the current back-lever progression with locked elbows, active shoulders and a straight body line.",
+    cues: ["Locked elbows", "Squeeze glutes", "Control shoulder extension"],
+    common_mistakes: ["Sagging hips", "Relaxing into the shoulders", "Forcing painful shoulder range"],
+    purpose: "Back-lever straight-arm strength and shoulder control",
+    progression_family: "back_lever",
+    pain_caution: "Stop if shoulder or biceps-tendon pain is sharp or increasing.",
   },
   {
     id: "ex-muscle-up",
@@ -287,6 +326,18 @@ export const EXERCISES: ExerciseDef[] = [
       "Rear foot elevated, lower front leg until controlled depth, then stand.",
     cues: ["Front knee tracks toes", "Torso stable", "Drive through whole foot"],
     common_mistakes: ["Pushing excessively off rear leg"],
+  },
+  {
+    id: "ex-single-leg-rdl",
+    slug: "single-leg-rdl",
+    name: "Single-leg Romanian deadlift",
+    category: "strength",
+    metric_type: "load_reps",
+    instructions:
+      "Stand on one leg, hinge at the hip while the free leg reaches back, then drive the hip forward to stand tall.",
+    cues: ["Square the hips", "Soft knee", "Long spine", "Control the balance"],
+    common_mistakes: ["Rotating the pelvis open", "Rounding the back", "Turning it into a squat"],
+    purpose: "Posterior-chain strength, hip stability and single-leg balance",
   },
   {
     id: "ex-nordic",
@@ -526,9 +577,10 @@ export const EXERCISES: ExerciseDef[] = [
     name: "Strong/easy intervals",
     category: "endurance",
     metric_type: "duration",
-    instructions: "Alternate strong and easy running intervals continuously.",
-    cues: ["Controlled strong pace", "True easy recovery"],
-    common_mistakes: ["Making easy intervals too hard"],
+    instructions:
+      "Run the prescribed number of strong repetitions. Each strong repetition is followed by the prescribed easy-jog recovery before the next strong repetition.",
+    cues: ["Strong = RPE 7–8/10, controlled rather than sprinting", "Easy jog = RPE 2–3/10", "Keep every strong repetition similar in quality"],
+    common_mistakes: ["Starting the first interval too fast", "Making easy recoveries too hard", "Turning strong intervals into maximal sprints"],
   },
   {
     id: "ex-steady-run",
