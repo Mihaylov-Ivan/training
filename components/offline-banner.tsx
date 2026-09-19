@@ -51,13 +51,5 @@ export function OfflineBanner() {
     );
   }
 
-  if (syncStatus === "syncing") {
-    return (
-      <div role="status" className={`${base} bg-accent-soft/90 text-accent`}>
-        Syncing…
-      </div>
-    );
-  }
-
   return null;
 }
