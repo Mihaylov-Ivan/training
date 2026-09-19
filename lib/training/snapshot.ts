@@ -162,15 +162,21 @@ export function resolvePrescription(
       const rounds = Number(state.state.rounds ?? 6);
       const strongSec = Number(state.state.strong_sec ?? 120);
       const easySec = Number(state.state.easy_sec ?? 120);
+      const paceOffset = Number(state.state.pace_offset_sec_per_km ?? 0);
+      const paceNote =
+        paceOffset < 0
+          ? ` · strong pace target ~${Math.abs(paceOffset)} sec/km faster than your starting interval baseline`
+          : "";
       p.sets = rounds;
       p.duration_seconds = strongSec;
       p.rest_seconds = easySec;
-      p.notes = `${rounds} strong reps: ${Math.floor(strongSec / 60)}:${String(strongSec % 60).padStart(2, "0")} strong @ RPE 7–8/10 + ${Math.floor(easySec / 60)}:${String(easySec % 60).padStart(2, "0")} easy jog between reps`;
+      p.notes = `${rounds} strong reps: ${Math.floor(strongSec / 60)}:${String(strongSec % 60).padStart(2, "0")} strong @ RPE 7–8/10 + ${Math.floor(easySec / 60)}:${String(easySec % 60).padStart(2, "0")} easy jog between reps${paceNote}`;
       p.extras = {
         ...p.extras,
         intervals: rounds,
         strong_sec: strongSec,
         easy_sec: easySec,
+        pace_offset_sec_per_km: paceOffset,
         strong_rpe: "7–8/10",
         easy_rpe: "2–3/10",
         rest_label: "Easy jog",
