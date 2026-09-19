@@ -125,6 +125,73 @@ describe("PLANCHE_V1", () => {
   });
 });
 
+describe("lever progression", () => {
+  it("light technique sessions do not earn lever credits", () => {
+    const result = evaluateProgression(
+      state({
+        scope_type: "global_skill",
+        scope_id: "front_lever",
+        current_level: "tuck",
+        state: { level: "tuck", success_credits: 0 },
+      }),
+      {
+        ruleCode: "FRONT_LEVER_V1",
+        completedAll: true,
+        difficulty: 6,
+        sessionItemId: "si",
+        userId: "u",
+        metrics: { lever_protocol: "light" },
+      },
+    );
+    expect(result.state.state.success_credits).toBe(0);
+    expect(result.event.event_type).toBe("hold");
+  });
+
+  it("three controlled hard sessions advance the lever level", () => {
+    let s = state({
+      scope_type: "global_skill",
+      scope_id: "front_lever",
+      current_level: "tuck",
+      state: { level: "tuck", success_credits: 0 },
+    });
+    for (let i = 0; i < 3; i++) {
+      s = evaluateProgression(s, {
+        ruleCode: "FRONT_LEVER_V1",
+        completedAll: true,
+        difficulty: 7,
+        sessionItemId: "si",
+        userId: "u",
+        metrics: { lever_protocol: "hard" },
+      }).state;
+    }
+    expect(s.state.level).toBe("advanced_tuck");
+  });
+});
+
+describe("RUN_INTERVALS_V1", () => {
+  it("reduces easy recovery before adding rounds", () => {
+    let s = state({
+      scope_type: "capability",
+      scope_id: "run_intervals",
+      state: {
+        rounds: 6,
+        strong_sec: 120,
+        easy_sec: 120,
+        pace_offset_sec_per_km: 0,
+      },
+    });
+    s = evaluateProgression(s, {
+      ruleCode: "RUN_INTERVALS_V1",
+      completedAll: true,
+      difficulty: 7,
+      sessionItemId: "si",
+      userId: "u",
+    }).state;
+    expect(s.state.easy_sec).toBe(110);
+    expect(s.state.rounds).toBe(6);
+  });
+});
+
 describe("FRONT_SPLIT_V1", () => {
   it("two credits reduce gap by 1 cm", () => {
     let s = state({
