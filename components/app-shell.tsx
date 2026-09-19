@@ -24,13 +24,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [hydrated, profile, pathname, router]);
 
+  const immersive =
+    pathname?.startsWith("/session") || pathname?.startsWith("/onboarding");
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl md:flex-row">
       <AutoSync />
       <AppNav />
-      <div className="flex min-h-dvh flex-1 flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <OfflineBanner />
-        <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-8">{children}</main>
+        <main
+          className={
+            immersive
+              ? "min-h-0 flex-1"
+              : "flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-8"
+          }
+        >
+          {children}
+        </main>
       </div>
     </div>
   );
