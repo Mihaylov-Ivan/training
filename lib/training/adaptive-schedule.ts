@@ -38,6 +38,7 @@ export function classifySession(
   if (role === "climbing") return "CLIMBING";
   if (role === "boxing") return "BOXING";
   if (role === "swim_performance" || role === "swim_recovery") return "SWIMMING";
+  if (role === "daily_skill_practice") return "SKILL_PRACTICE";
   if (role === "short_deep_flex") return "DEEP_FLEXIBILITY";
   if (
     role === "short_mobility_front" ||
