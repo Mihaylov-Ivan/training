@@ -5,6 +5,8 @@ import {
   detectPendingMissedSessions,
   markPastSessionsPending,
   recalculateSchedule,
+  respectsMainWorkoutBoundaries,
+  MAX_MAIN_WORKOUTS_PER_CALENDAR_WEEK,
 } from "@/lib/training/adaptive-schedule";
 import {
   createActiveCycle,
@@ -49,7 +51,9 @@ describe("adaptive schedule engine", () => {
     const tue = byDate(sessions, addDays(START, 1))!;
     expect(classifySession(tue)).toBe("MOBILITY_RECOVERY");
     const thu = byDate(sessions, addDays(START, 3))!;
-    expect(classifySession(thu)).toBe("DEEP_FLEXIBILITY");
+    expect(classifySession(thu)).toBe("BOXING");
+    const sun = byDate(sessions, addDays(START, 6))!;
+    expect(classifySession(sun)).toBe("SKILL_PRACTICE");
   });
 
   it("Monday main workout missed — shifts A then B with recovery gap", () => {
@@ -165,7 +169,8 @@ describe("adaptive schedule engine", () => {
 
   it("Thursday flexibility missed — may move one day or skip", () => {
     const { cycle, sessions } = buildWeek();
-    const thu = byDate(sessions, addDays(START, 3))!;
+    const thu = byDate(sessions, addDays(START, 10))!;
+    expect(thu.day_role).toBe("short_deep_flex");
     const proposal = recalculateSchedule({
       missedSession: thu,
       upcomingSessions: sessions,
@@ -386,6 +391,69 @@ describe("adaptive schedule engine", () => {
       (s) => s.rescheduled_from_id === mon.id,
     );
     expect(makeup?.date).toBe(target);
+  });
+
+  it("daily and weekly main-workout boundaries are hard limits", () => {
+    const { sessions } = buildWeek();
+    expect(respectsMainWorkoutBoundaries(sessions)).toBe(true);
+
+    const mon = byDate(sessions, START)!;
+    const duplicateDay = normalizeScheduledSession({
+      ...mon,
+      id: "duplicate-main",
+      day_role: "athleticism_endurance",
+      routine_template_id: "routine-wednesday-w1",
+      generated_from_schedule: false,
+      sequence_index: 99,
+    });
+    expect(
+      respectsMainWorkoutBoundaries([...sessions, duplicateDay]),
+    ).toBe(false);
+
+    const mondayWeek = sessions.filter(
+      (session) => session.date >= START && session.date <= addDays(START, 6),
+    );
+    const existingMains = mondayWeek.filter((session) =>
+      [
+        "strength_power",
+        "athleticism_endurance",
+        "calisthenics_volume",
+        "climbing",
+      ].includes(session.day_role),
+    );
+    expect(existingMains.length).toBeLessThanOrEqual(
+      MAX_MAIN_WORKOUTS_PER_CALENDAR_WEEK,
+    );
+
+    const extraMains = [1, 2].map((index) =>
+      normalizeScheduledSession({
+        ...mon,
+        id: `extra-main-${index}`,
+        date: addDays(START, index === 1 ? 1 : 3),
+        original_date: addDays(START, index === 1 ? 1 : 3),
+        generated_from_schedule: false,
+        sequence_index: 100 + index,
+      }),
+    );
+    expect(
+      respectsMainWorkoutBoundaries([...sessions, ...extraMains]),
+    ).toBe(false);
+  });
+
+  it("every applied main-workout reschedule respects the hard load boundaries", () => {
+    const { cycle, sessions } = buildWeek();
+    for (const offset of [0, 2, 5]) {
+      const missed = byDate(sessions, addDays(START, offset))!;
+      const proposal = recalculateSchedule({
+        missedSession: missed,
+        upcomingSessions: sessions,
+        cycle,
+        reason: "no_time",
+      });
+      expect(
+        respectsMainWorkoutBoundaries(proposal.updated_sessions),
+      ).toBe(true);
+    }
   });
 
   it("pending missed detection and late log path leave progression untouched", () => {
