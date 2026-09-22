@@ -251,7 +251,7 @@ export default function OnboardingPage() {
 
         {step === 4 && (
           <p className="text-sm text-muted">
-            Default schedule: Mon/Wed/Sat primary · Tue/Thu/Fri short · Sun recovery.
+            Default schedule: Mon/Wed/Sat primary · Tue/Thu/Fri short or specialty · Sun light OAHS + planche.
             You can change days later in Settings without changing the training sequence.
           </p>
         )}
