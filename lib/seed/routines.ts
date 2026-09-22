@@ -951,7 +951,6 @@ const saturdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const tuesdayItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "wall-slide",
@@ -1007,7 +1006,6 @@ const tuesdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const thursdayItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "cossack-squat",
@@ -1079,7 +1077,6 @@ const thursdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const fridayItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "chin-tuck",
@@ -1162,7 +1159,6 @@ const fridayItems: RoutineItemDef[] = [
 
 resetSeq();
 const swimPerfItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     exercise_slug: "swimming-session",
     block: "swim",
@@ -1177,7 +1173,6 @@ const swimPerfItems: RoutineItemDef[] = [
 
 resetSeq();
 const swimRecItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     exercise_slug: "swimming-session",
     block: "swim",
@@ -1192,7 +1187,6 @@ const swimRecItems: RoutineItemDef[] = [
 
 resetSeq();
 const boxingItems: RoutineItemDef[] = [
-  ...dailySkillPrimerItems(),
   item({
     exercise_slug: "boxing-session",
     block: "conditioning",
@@ -1206,7 +1200,7 @@ const boxingItems: RoutineItemDef[] = [
 ];
 
 resetSeq();
-const sundaySkillItems: RoutineItemDef[] = [
+const dailySkillItems: RoutineItemDef[] = [
   ...dailySkillPrimerItems(),
 ];
 
@@ -1373,11 +1367,11 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-sunday-skills",
-    name: "Sunday — Light OAHS + Planche",
+    name: "Light OAHS + Planche",
     kind: "short",
-    description: "10-minute light skill primer · OAHS emphasis + planche",
+    description: "Separate 10-minute light skill practice · OAHS emphasis + planche",
     day_roles: ["daily_skill_practice"],
-    items: sundaySkillItems,
+    items: dailySkillItems,
   }),
   withEstimatedDuration({
     id: "routine-monday",
@@ -1390,9 +1384,9 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-tuesday",
-    name: "Tuesday — Light OAHS + Planche + Mobility",
+    name: "Tuesday — Mobility + Front Split",
     kind: "short",
-    description: "10-minute OAHS-heavy skill primer + front-split focused mobility",
+    description: "Mobility and front-split work · daily OAHS + planche is a separate session",
     day_roles: ["short_mobility_front"],
     items: tuesdayItems,
   }),
@@ -1430,17 +1424,17 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-thursday",
-    name: "Thursday — Light OAHS + Planche + Deep Flexibility",
+    name: "Thursday — Deep Flexibility",
     kind: "short",
-    description: "10-minute OAHS-heavy skill primer + deep flexibility",
+    description: "Deep flexibility work · daily OAHS + planche is a separate session",
     day_roles: ["short_deep_flex"],
     items: thursdayItems,
   }),
   withEstimatedDuration({
     id: "routine-friday",
-    name: "Friday — Light OAHS + Planche + Recovery",
+    name: "Friday — Mobility + Recovery",
     kind: "short",
-    description: "10-minute OAHS-heavy skill primer + joint/spine recovery",
+    description: "Joint, spine and mobility recovery · daily OAHS + planche is a separate session",
     day_roles: ["short_recovery"],
     items: fridayItems,
   }),
@@ -1448,7 +1442,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     id: "routine-swim-perf",
     name: "Friday — Swimming · 45 min",
     kind: "swim",
-    description: "Daily light OAHS + planche primer, then 45 minutes swimming",
+    description: "45 minutes swimming · daily OAHS + planche is a separate session",
     day_roles: ["swim_performance"],
     items: swimPerfItems,
   }),
@@ -1456,7 +1450,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     id: "routine-swim-rec",
     name: "Friday — Swimming · 30 min",
     kind: "swim",
-    description: "Daily light OAHS + planche primer, then 30 minutes swimming",
+    description: "30 minutes swimming · daily OAHS + planche is a separate session",
     day_roles: ["swim_recovery"],
     items: swimRecItems,
   }),
@@ -1464,7 +1458,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     id: "routine-boxing",
     name: "Thursday — Boxing · 45 min",
     kind: "boxing",
-    description: "Daily light OAHS + planche primer, then 45 minutes boxing",
+    description: "45 minutes boxing · daily OAHS + planche is a separate session",
     day_roles: ["boxing"],
     items: boxingItems,
   }),
