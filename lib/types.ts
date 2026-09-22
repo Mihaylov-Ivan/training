@@ -102,6 +102,7 @@ export type DayRole =
   | "athleticism_endurance"
   | "short_deep_flex"
   | "short_recovery"
+  | "daily_skill_practice"
   | "swim_performance"
   | "swim_recovery"
   | "boxing"
