@@ -902,20 +902,20 @@ export function recalculateSchedule(opts: {
       }
     }
 
+    const manualExceptIds = new Set(
+      chain.slice(idx).map((candidate) => candidate.id).concat(missed.id),
+    );
     const manualMainTarget =
       isFirst &&
       opts.manualTargetDate &&
       canPlaceMainOnDate(
         opts.manualTargetDate,
         working,
-        new Set([session.id, missed.id]),
+        manualExceptIds,
       ) &&
       hasMainGap(
         opts.manualTargetDate,
-        occupiedDates(
-          working,
-          new Set([session.id, missed.id]),
-        ),
+        occupiedDates(working, manualExceptIds),
       )
         ? opts.manualTargetDate
         : null;
