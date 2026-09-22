@@ -86,6 +86,46 @@ describe("schedule live-row integrity", () => {
     expect(liveTuesday[0]!.id).toBe("moved-strength");
   });
 
+  it("does not regenerate a completed daily-skill card on ensure-style generation", () => {
+    const cycle = createActiveCycle("user-1", "2026-09-21");
+    const rows = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 1,
+    });
+    const skill = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "daily_skill_practice",
+    )!;
+    const completed = normalizeScheduledSession({
+      ...skill,
+      status: "completed",
+      completed_at: "2026-09-22T08:00:00.000Z",
+    });
+    const existing = rows.map((row) =>
+      row.id === skill.id ? completed : row,
+    );
+
+    const regenerated = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 1,
+      existing,
+    });
+
+    expect(
+      regenerated.filter(
+        (row) =>
+          row.date === "2026-09-22" &&
+          row.day_role === "daily_skill_practice",
+      ),
+    ).toHaveLength(1);
+    expect(
+      regenerated.find((row) => row.id === skill.id)?.status,
+    ).toBe("completed");
+  });
+
   it("allows terminal history alongside the two intentional live cards", () => {
     const cycle = createActiveCycle("user-1", "2026-09-21");
     const rows = generateScheduledSessions({
