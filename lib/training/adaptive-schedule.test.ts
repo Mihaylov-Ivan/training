@@ -195,6 +195,13 @@ describe("adaptive schedule engine", () => {
     expect(
       proposal.updated_sessions.find((s) => s.id === tue.id)?.status,
     ).toMatch(/missed|skipped/);
+    expect(
+      proposal.updated_sessions.find(
+        (session) =>
+          session.date === addDays(START, 1) &&
+          session.day_role === "daily_skill_practice",
+      )?.status,
+    ).toBe("scheduled");
   });
 
   it("Thursday flexibility missed — may move one day or skip", () => {
@@ -255,6 +262,14 @@ describe("adaptive schedule engine", () => {
           ),
       );
       expect(mainSameDay).toBe(false);
+      expect(
+        proposal.updated_sessions.some(
+          (session) =>
+            session.date === makeup.date &&
+            session.day_role === "daily_skill_practice" &&
+            session.status === "scheduled",
+        ),
+      ).toBe(true);
     }
   });
 
