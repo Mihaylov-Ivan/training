@@ -75,21 +75,37 @@ export function resolvePrescription(
       }
     }
     if (item.exercise_slug === "planche-hold") {
+      const dailyPrimer = p.extras?.daily_primer === true;
       const protocol =
-        cycleWeek === 4
+        dailyPrimer || cycleWeek === 4
           ? "light"
           : (p.protocol ?? item.protocol ?? "medium");
-      const holds = resolvePlancheHolds(protocol, state.state);
       p.protocol = protocol;
       p.exercise_level = (state.current_level ?? state.state.level) as string;
-      p.notes = `Planche ${protocol} @ ${p.exercise_level}: lean ${holds.lean}; holds ${holds.holds}`;
-      p.extras = { ...p.extras, ...holds, level: p.exercise_level };
-      p.hold_seconds = holds.holdSec;
-      p.sets = holds.sets;
+
+      if (dailyPrimer) {
+        p.notes = `2-min light planche technique @ ${String(p.exercise_level).replace(/_/g, " ")} — easy lean + clean attempts`;
+        p.extras = {
+          ...p.extras,
+          level: p.exercise_level,
+          planche_protocol: "light",
+        };
+        delete p.hold_seconds;
+        delete p.sets;
+      } else {
+        const holds = resolvePlancheHolds(protocol, state.state);
+        p.notes = `Planche ${protocol} @ ${p.exercise_level}: lean ${holds.lean}; holds ${holds.holds}`;
+        p.extras = { ...p.extras, ...holds, level: p.exercise_level };
+        p.hold_seconds = holds.holdSec;
+        p.sets = holds.sets;
+      }
     }
     if (item.exercise_slug === "oahs-practice") {
       p.exercise_level = (state.current_level ?? state.state.level) as string;
-      p.notes = `OAHS level: ${String(p.exercise_level).replace(/_/g, " ")}`;
+      p.notes =
+        p.extras?.daily_primer === true
+          ? `5-min light OAHS technique @ ${String(p.exercise_level).replace(/_/g, " ")} — quality first`
+          : `OAHS level: ${String(p.exercise_level).replace(/_/g, " ")}`;
     }
     if (item.exercise_slug === "one-leg-human-flag") {
       const ctx =
