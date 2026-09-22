@@ -95,7 +95,7 @@ export function readinessPercent(checkin: {
 
 export function defaultWeekdayMap(): Record<string, string | null> {
   return {
-    "0": "recovery",
+    "0": "daily_skill_practice",
     "1": "strength_power",
     "2": "short_mobility_front",
     "3": "athleticism_endurance",
