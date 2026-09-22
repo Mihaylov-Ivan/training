@@ -11,6 +11,7 @@ export const CURRENT_SCHEDULE_RESET_VERSION = 1;
 
 const RESETTABLE_STATUSES = new Set<ScheduledSession["status"]>([
   "scheduled",
+  "in_progress",
   "pending_missed_confirmation",
   "overdue",
   "cancelled",
