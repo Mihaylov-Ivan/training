@@ -111,6 +111,77 @@ describe("future schedule reset", () => {
     ).toHaveLength(1);
   });
 
+  it("removes future skipped rows such as obsolete maintenance cards", () => {
+    const cycle = createActiveCycle("user-1", START);
+    const normal = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 4,
+    });
+    const sunday = normal.find((row) => row.date === "2026-09-27")!;
+    const obsoleteMaintenance = normalizeScheduledSession({
+      ...sunday,
+      id: "old-maintenance-skip",
+      routine_template_id: "routine-maintenance",
+      day_role: "recovery",
+      status: "skipped",
+      generated_from_schedule: false,
+    });
+
+    const result = buildFutureScheduleReset({
+      userId: "user-1",
+      cycle,
+      scheduledSessions: [...normal, obsoleteMaintenance],
+      trainingSessions: [],
+      fromDate: RESET_DATE,
+      weeksAhead: 4,
+    });
+
+    expect(result.removedIds).toContain("old-maintenance-skip");
+    expect(
+      result.scheduledSessions.some(
+        (row) => row.id === "old-maintenance-skip",
+      ),
+    ).toBe(false);
+    expect(
+      result.scheduledSessions.filter(
+        (row) =>
+          row.date === "2026-09-27" &&
+          row.status === "scheduled",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("preserves schedule history before the reset date", () => {
+    const cycle = createActiveCycle("user-1", START);
+    const normal = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 4,
+    });
+    const monday = normal.find((row) => row.date === START)!;
+    const pastMissed = normalizeScheduledSession({
+      ...monday,
+      id: "past-missed",
+      status: "missed",
+      generated_from_schedule: false,
+    });
+
+    const result = buildFutureScheduleReset({
+      userId: "user-1",
+      cycle,
+      scheduledSessions: [...normal, pastMissed],
+      trainingSessions: [],
+      fromDate: RESET_DATE,
+      weeksAhead: 4,
+    });
+
+    expect(
+      result.scheduledSessions.find((row) => row.id === "past-missed")
+        ?.status,
+    ).toBe("missed");
+  });
+
   it("does not delete a future schedule row already linked to a training session", () => {
     const cycle = createActiveCycle("user-1", START);
     const normal = generateScheduledSessions({
