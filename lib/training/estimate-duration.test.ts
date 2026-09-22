@@ -177,6 +177,80 @@ describe("estimateRoutineDurationMin", () => {
     }
   });
 
+  it("every scheduled day template contains OAHS and planche practice", () => {
+    const scheduledRoutineIds = [
+      "routine-monday",
+      "routine-tuesday",
+      "routine-wednesday-w1",
+      "routine-wednesday-w2",
+      "routine-wednesday-w3",
+      "routine-wednesday-w4",
+      "routine-thursday",
+      "routine-friday",
+      "routine-swim-perf",
+      "routine-swim-rec",
+      "routine-boxing",
+      "routine-saturday",
+      "routine-climbing",
+      "routine-sunday-skills",
+    ];
+    for (const id of scheduledRoutineIds) {
+      const routine = getRoutineById(id)!;
+      const slugs = routine.items.map((item) => item.exercise_slug);
+      expect(slugs).toContain("oahs-practice");
+      expect(slugs).toContain("planche-hold");
+    }
+  });
+
+  it("non-main skill primer emphasizes OAHS and keeps planche light", () => {
+    for (const id of [
+      "routine-tuesday",
+      "routine-thursday",
+      "routine-friday",
+      "routine-sunday-skills",
+      "routine-swim-perf",
+      "routine-swim-rec",
+      "routine-boxing",
+    ]) {
+      const routine = getRoutineById(id)!;
+      const oahs = routine.items.find(
+        (item) => item.exercise_slug === "oahs-practice",
+      )!;
+      const planche = routine.items.find(
+        (item) => item.exercise_slug === "planche-hold",
+      )!;
+      expect(oahs.prescription.duration_seconds).toBe(300);
+      expect(planche.prescription.duration_seconds).toBe(120);
+      expect(planche.prescription.protocol).toBe("light");
+      expect(planche.prescription.extras?.daily_primer).toBe(true);
+    }
+  });
+
+  it("swimming and boxing are duration-only sport blocks", () => {
+    const swimPerf = getRoutineById("routine-swim-perf")!;
+    const swimRec = getRoutineById("routine-swim-rec")!;
+    const boxing = getRoutineById("routine-boxing")!;
+
+    expect(
+      swimPerf.items.filter((item) => item.block === "swim"),
+    ).toHaveLength(1);
+    expect(
+      swimPerf.items.find((item) => item.block === "swim")
+        ?.prescription.duration_seconds,
+    ).toBe(2700);
+    expect(
+      swimRec.items.find((item) => item.block === "swim")
+        ?.prescription.duration_seconds,
+    ).toBe(1800);
+    expect(
+      boxing.items.filter((item) => item.exercise_slug === "boxing-session"),
+    ).toHaveLength(1);
+    expect(
+      boxing.items.find((item) => item.exercise_slug === "boxing-session")
+        ?.prescription.duration_seconds,
+    ).toBe(2700);
+  });
+
   it("monday keeps skills fresh before lower-body warmup", () => {
     const mon = getRoutineById("routine-monday")!;
     const slugs = mon.items.map((i) => i.exercise_slug);
