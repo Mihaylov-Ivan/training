@@ -184,6 +184,14 @@ export function evaluateProgression(
       break;
     }
     case "OAHS_V1": {
+      const protocol = String(input.metrics?.oahs_protocol ?? "main");
+      if (protocol === "light") {
+        eventType = "hold";
+        explanation =
+          "Light daily OAHS practice logged — formal level progression is driven by main-session practice.";
+        preview = `Current OAHS level: ${String(state.state.level).replace(/_/g, " ")}`;
+        break;
+      }
       if (yes) {
         const credits = Number(state.state.skill_credits ?? 0) + 1;
         state.state.skill_credits = credits;
