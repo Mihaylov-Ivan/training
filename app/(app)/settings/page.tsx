@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const updateProfile = useAppStore((s) => s.updateProfile);
   const exportData = useAppStore((s) => s.exportData);
   const resetDemo = useAppStore((s) => s.resetDemo);
+  const resetFutureSchedule = useAppStore((s) => s.resetFutureSchedule);
   const syncNow = useAppStore((s) => s.syncNow);
   const lastSyncedAt = useAppStore((s) => s.lastSyncedAt);
   const syncStatus = useAppStore((s) => s.syncStatus);
@@ -24,6 +25,8 @@ export default function SettingsPage() {
   const authUserId = useAppStore((s) => s.authUserId);
   const [syncing, setSyncing] = useState(false);
   const [syncOk, setSyncOk] = useState(false);
+  const [resettingSchedule, setResettingSchedule] = useState(false);
+  const [scheduleResetMessage, setScheduleResetMessage] = useState<string | null>(null);
 
   if (!profile) {
     return <p className="text-muted">Complete onboarding first.</p>;
@@ -120,6 +123,50 @@ export default function SettingsPage() {
         >
           {syncing ? "Syncing…" : "Sync now"}
         </PrimaryButton>
+
+        <Card>
+          <p className="font-semibold">Schedule repair</p>
+          <p className="mt-1 text-sm text-muted">
+            Rebuild the schedule from today using the current training rules. Completed
+            workouts, missed-history records, progression, wellbeing and exercise history
+            are preserved.
+          </p>
+          {scheduleResetMessage ? (
+            <p className="mt-2 text-sm text-success">{scheduleResetMessage}</p>
+          ) : null}
+          <SecondaryButton
+            className="mt-4 w-full"
+            disabled={resettingSchedule}
+            onClick={() => {
+              if (
+                !confirm(
+                  "Reset future schedule from today? Completed history and progression will be kept, but future scheduled/rescheduled sessions will be rebuilt.",
+                )
+              ) {
+                return;
+              }
+              setResettingSchedule(true);
+              setScheduleResetMessage(null);
+              void resetFutureSchedule()
+                .then((result) => {
+                  setScheduleResetMessage(
+                    `Future schedule rebuilt. Removed ${result.removed} old future entries.`,
+                  );
+                  router.refresh();
+                })
+                .catch((err) => {
+                  setScheduleResetMessage(
+                    err instanceof Error
+                      ? err.message
+                      : "Could not reset future schedule.",
+                  );
+                })
+                .finally(() => setResettingSchedule(false));
+            }}
+          >
+            {resettingSchedule ? "Rebuilding schedule…" : "Reset future schedule"}
+          </SecondaryButton>
+        </Card>
 
         <PrimaryButton
           className="w-full"
