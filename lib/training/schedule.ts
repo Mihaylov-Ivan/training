@@ -93,6 +93,52 @@ function isMainWorkoutRoleLocal(role: DayRole): boolean {
   ].includes(role);
 }
 
+const LIVE_SCHEDULE_STATUSES = new Set<ScheduledSession["status"]>([
+  "scheduled",
+  "in_progress",
+  "pending_missed_confirmation",
+  "overdue",
+]);
+
+function liveSchedulePriority(session: ScheduledSession): number {
+  if (session.status === "in_progress") return 100;
+  if (!session.generated_from_schedule) return 80;
+  if (session.manually_rescheduled || session.auto_rescheduled) return 75;
+  if (isMainWorkoutRoleLocal(session.day_role)) return 60;
+  return 40;
+}
+
+/**
+ * Historical missed/completed rows may coexist on a date, but only one live
+ * calendar entry is allowed. This protects against duplicate rows with
+ * different ids returning from older sync/reschedule logic.
+ */
+export function canonicalizeLiveScheduleRows(
+  rows: ScheduledSession[],
+): ScheduledSession[] {
+  const history: ScheduledSession[] = [];
+  const liveByDate = new Map<string, ScheduledSession>();
+
+  for (const raw of rows.map(normalizeScheduledSession)) {
+    if (!LIVE_SCHEDULE_STATUSES.has(raw.status)) {
+      history.push(raw);
+      continue;
+    }
+
+    const current = liveByDate.get(raw.date);
+    if (
+      !current ||
+      liveSchedulePriority(raw) > liveSchedulePriority(current)
+    ) {
+      liveByDate.set(raw.date, raw);
+    }
+  }
+
+  return [...history, ...liveByDate.values()].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
+}
+
 export function generateScheduledSessions(opts: {
   userId: string;
   cycle: TrainingCycle;
@@ -101,9 +147,9 @@ export function generateScheduledSessions(opts: {
   existing?: ScheduledSession[];
 }): ScheduledSession[] {
   const weeks = opts.weeksAhead ?? 6;
-  const existing = (opts.existing ?? [])
-    .map(normalizeScheduledSession)
-    .map((session) => {
+  const existing = canonicalizeLiveScheduleRows(
+    (opts.existing ?? []).map(normalizeScheduledSession),
+  ).map((session) => {
       if (
         !session.generated_from_schedule ||
         session.status !== "scheduled"
@@ -163,7 +209,7 @@ export function generateScheduledSessions(opts: {
     );
   }
 
-  return out.sort((a, b) => a.date.localeCompare(b.date));
+  return canonicalizeLiveScheduleRows(out);
 }
 
 export function isPrimaryRole(role: DayRole): boolean {
