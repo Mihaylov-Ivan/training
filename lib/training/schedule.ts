@@ -27,9 +27,17 @@ export function resolveDayRole(
   const role =
     (mapped as DayRole | null | undefined) ?? BASE_ROLES[weekdayNum];
 
-  // Friday specialty rotation: boxing and swimming remain occasional.
+  // Occasional boxing replaces Thursday deep-flex in Weeks 1 and 3.
+  // Friday remains a recovery day before Saturday unless it is a swim week.
+  if (
+    (weekdayNum === 4 || role === "short_deep_flex") &&
+    (cycleWeek === 1 || cycleWeek === 3)
+  ) {
+    return "boxing";
+  }
+
+  // Occasional swimming remains on Friday in Weeks 2 and 4.
   if (weekdayNum === 5 || role === "short_recovery") {
-    if (cycleWeek === 1 || cycleWeek === 3) return "boxing";
     if (cycleWeek === 2) return "swim_performance";
     if (cycleWeek === 4) return "swim_recovery";
   }
