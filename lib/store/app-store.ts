@@ -423,15 +423,44 @@ export const useAppStore = create<AppState>()(
       ensureSchedule: () => {
         const { cycles, scheduledSessions, schedulePrefs, profile } = get();
         if (!profile || !cycles[0]) return;
+        const before = normalizeScheduledSessions(scheduledSessions);
         const next = generateScheduledSessions({
           userId: currentUserId(get),
           cycle: cycles[0],
           weeksAhead: 6,
           weekdayMap: schedulePrefs?.weekday_map,
-          existing: normalizeScheduledSessions(scheduledSessions),
+          existing: before,
         });
+        const nextIds = new Set(next.map((session) => session.id));
+        const droppedDuplicateIds = before
+          .filter(
+            (session) =>
+              session.date >= todayISO() &&
+              !nextIds.has(session.id) &&
+              [
+                "scheduled",
+                "in_progress",
+                "pending_missed_confirmation",
+                "overdue",
+              ].includes(session.status),
+          )
+          .map((session) => session.id);
+
         set({ scheduledSessions: next });
-        queueOrSync(() => syncScheduledSessions(next));
+        queueOrSync(async () => {
+          const userId = currentUserId(get);
+          if (
+            droppedDuplicateIds.length > 0 &&
+            isSupabaseConfigured() &&
+            userId !== LOCAL_USER_ID
+          ) {
+            await deleteScheduledSessionsByIds(
+              userId,
+              droppedDuplicateIds,
+            );
+          }
+          await syncScheduledSessions(next);
+        });
       },
 
       resetFutureSchedule: async (fromDate = todayISO()) => {
