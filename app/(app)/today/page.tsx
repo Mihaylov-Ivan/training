@@ -450,7 +450,15 @@ export default function TodayPage() {
                 >
                   {todaySched.rescheduled_from_id || todaySched.auto_rescheduled
                     ? "Rescheduled session"
-                    : "Primary session"}
+                    : routine.kind === "short"
+                      ? "Daily skill / mobility"
+                      : routine.kind === "swim"
+                        ? "Swimming"
+                        : routine.kind === "boxing"
+                          ? "Boxing"
+                          : routine.kind === "climb"
+                            ? "Climbing"
+                            : "Main workout"}
                   {primaryDone ? " · Complete" : overdue ? " · Overdue" : ""}
                 </p>
                 <h2 className="mt-1 text-xl font-semibold">{routine.name}</h2>
