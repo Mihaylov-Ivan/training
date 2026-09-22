@@ -204,6 +204,8 @@ export interface SchedulePreferences {
   user_id: string;
   /** weekday 0=Sun .. 6=Sat -> day_role key for base week */
   weekday_map: Record<string, DayRole | null>;
+  /** Cloud-backed marker for one-time schedule migrations. */
+  schedule_reset_version?: number;
 }
 
 export interface TrainingCycle {
