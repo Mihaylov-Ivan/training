@@ -112,6 +112,73 @@ function plancheItem(sequence: number, protocol: "hard" | "medium" | "light"): R
   });
 }
 
+function dailySkillPrimerItems(): RoutineItemDef[] {
+  return [
+    item({
+      exercise_slug: "wrist-rocks",
+      block: "warmup",
+      prescription: {
+        sets: 1,
+        reps_per_set: 10,
+        rest_seconds: 0,
+        notes: "Quick wrist prep before daily skills",
+        extras: { forward: 10, lateral: 10 },
+      },
+      rest_seconds: 0,
+    }),
+    item({
+      exercise_slug: "oahs-practice",
+      block: "skill",
+      prescription: {
+        duration_seconds: 300,
+        rest_seconds: 0,
+        notes: "5-min light OAHS technique — quality first, stop before fatigue",
+        extras: {
+          oahs_protocol: "light",
+          daily_primer: true,
+          steps: [
+            { name: "Wall weight shifts", detail: "1 x 20 sec", rest: 20 },
+            {
+              name: "Fingertip-assisted OAHS",
+              detail: "2 x 8 sec each arm",
+              rest: 15,
+            },
+            {
+              name: "Free OAHS attempts",
+              detail: "3 quality attempts each arm, max 8 sec",
+              rest: 15,
+            },
+          ],
+        },
+      },
+      rest_seconds: 0,
+      progression_rule_code: "OAHS_V1",
+      progression_scope: "global_skill",
+    }),
+    item({
+      exercise_slug: "planche-hold",
+      block: "skill",
+      protocol: "light",
+      prescription: {
+        duration_seconds: 120,
+        protocol: "light",
+        rest_seconds: 45,
+        notes: "2-min light planche technique — easy lean + clean current-level attempts",
+        extras: {
+          daily_primer: true,
+          lean: "2 x 15 sec",
+          holds: "2 easy current-level attempts",
+          leanRest: 20,
+          holdRest: 30,
+        },
+      },
+      rest_seconds: 45,
+      progression_rule_code: "PLANCHE_V1",
+      progression_scope: "global_skill",
+    }),
+  ];
+}
+
 function flagItem(
   sequence: number,
   opts: {
@@ -884,14 +951,7 @@ const saturdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const tuesdayItems: RoutineItemDef[] = [
-  item({
-    exercise_slug: "wrist-rocks",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
-    rest_seconds: 0,
-  }),
-  oahsItem(1),
-  plancheItem(2, "light"),
+  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "wall-slide",
@@ -947,14 +1007,7 @@ const tuesdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const thursdayItems: RoutineItemDef[] = [
-  item({
-    exercise_slug: "wrist-rocks",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
-    rest_seconds: 0,
-  }),
-  oahsItem(1),
-  plancheItem(2, "light"),
+  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "cossack-squat",
@@ -1026,14 +1079,7 @@ const thursdayItems: RoutineItemDef[] = [
 
 resetSeq();
 const fridayItems: RoutineItemDef[] = [
-  item({
-    exercise_slug: "wrist-rocks",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0, extras: { forward: 10, lateral: 10 } },
-    rest_seconds: 0,
-  }),
-  oahsItem(1),
-  plancheItem(2, "medium"),
+  ...dailySkillPrimerItems(),
   item({
     sequence: 4,
     exercise_slug: "chin-tuck",
@@ -1116,89 +1162,52 @@ const fridayItems: RoutineItemDef[] = [
 
 resetSeq();
 const swimPerfItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
   item({
-    exercise_slug: "easy-freestyle",
-    block: "swim",
-    prescription: { distance_m: 200, rest_seconds: 30 },
-    rest_seconds: 30,
-  }),
-  item({
-    exercise_slug: "catch-up-freestyle",
+    exercise_slug: "swimming-session",
     block: "swim",
     prescription: {
-      sets: 4,
-      distance_m: 50,
-      rest_seconds: 20,
-      notes: "25 m catch-up + 25 m normal",
+      duration_seconds: 2700,
+      rest_seconds: 0,
+      notes: "45 minutes swimming — choose the session yourself",
     },
-    rest_seconds: 20,
-  }),
-  item({
-    exercise_slug: "strong-controlled-freestyle",
-    block: "swim",
-    prescription: {
-      sets: 6,
-      distance_m: 50,
-      rest_seconds: 30,
-      extras: { strong_repeats: 6 },
-    },
-    rest_seconds: 30,
-    progression_rule_code: "SWIM_PERFORMANCE_V1",
-    progression_scope: "capability",
-  }),
-  item({
-    exercise_slug: "fast-freestyle",
-    block: "swim",
-    prescription: { sets: 4, distance_m: 25, rest_seconds: 40 },
-    rest_seconds: 40,
-  }),
-  item({
-    exercise_slug: "easy-freestyle",
-    block: "swim",
-    prescription: { distance_m: 100, rest_seconds: 0 },
     rest_seconds: 0,
   }),
 ];
 
 resetSeq();
 const swimRecItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
   item({
-    exercise_slug: "easy-freestyle",
-    block: "swim",
-    prescription: { distance_m: 200, rest_seconds: 30 },
-    rest_seconds: 30,
-  }),
-  item({
-    exercise_slug: "catch-up-freestyle",
+    exercise_slug: "swimming-session",
     block: "swim",
     prescription: {
-      sets: 4,
-      distance_m: 50,
-      rest_seconds: 20,
-      notes: "25 m catch-up + 25 m normal",
+      duration_seconds: 1800,
+      rest_seconds: 0,
+      notes: "30 minutes swimming — choose the session yourself",
     },
-    rest_seconds: 20,
-  }),
-  item({
-    exercise_slug: "freestyle-breathing-3",
-    block: "swim",
-    prescription: { sets: 4, distance_m: 50, rest_seconds: 30 },
-    rest_seconds: 30,
-    progression_rule_code: "SWIM_RECOVERY_V1",
-    progression_scope: "capability",
-  }),
-  item({
-    exercise_slug: "backstroke",
-    block: "swim",
-    prescription: { sets: 4, distance_m: 25, rest_seconds: 20 },
-    rest_seconds: 20,
-  }),
-  item({
-    exercise_slug: "easy-freestyle",
-    block: "swim",
-    prescription: { distance_m: 100, rest_seconds: 0, notes: "Very easy" },
     rest_seconds: 0,
   }),
+];
+
+resetSeq();
+const boxingItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
+  item({
+    exercise_slug: "boxing-session",
+    block: "conditioning",
+    prescription: {
+      duration_seconds: 2700,
+      rest_seconds: 0,
+      notes: "45 minutes boxing — choose the session yourself",
+    },
+    rest_seconds: 0,
+  }),
+];
+
+resetSeq();
+const sundaySkillItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
 ];
 
 resetSeq();
@@ -1359,8 +1368,16 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Daily maintenance",
     kind: "maintenance",
     description: "Neck + shoulders + spine + hips + ankles",
-    day_roles: ["recovery"],
+    day_roles: [],
     items: maintenanceItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-sunday-skills",
+    name: "Sunday — Light OAHS + Planche",
+    kind: "recovery",
+    description: "10-minute light skill primer · OAHS emphasis + planche",
+    day_roles: ["recovery"],
+    items: sundaySkillItems,
   }),
   withEstimatedDuration({
     id: "routine-monday",
@@ -1429,19 +1446,27 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-swim-perf",
-    name: "Friday — Performance swim 900 m",
+    name: "Friday — Swimming · 45 min",
     kind: "swim",
-    description: "Week 2 performance swim (skills omitted)",
+    description: "Daily light OAHS + planche primer, then 45 minutes swimming",
     day_roles: ["swim_performance"],
     items: swimPerfItems,
   }),
   withEstimatedDuration({
     id: "routine-swim-rec",
-    name: "Friday — Recovery/technique swim 800 m",
+    name: "Friday — Swimming · 30 min",
     kind: "swim",
-    description: "Week 4 recovery swim",
+    description: "Daily light OAHS + planche primer, then 30 minutes swimming",
     day_roles: ["swim_recovery"],
     items: swimRecItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-boxing",
+    name: "Friday — Boxing · 45 min",
+    kind: "boxing",
+    description: "Daily light OAHS + planche primer, then 45 minutes boxing",
+    day_roles: ["boxing"],
+    items: boxingItems,
   }),
   withEstimatedDuration({
     id: "routine-saturday",
@@ -1475,13 +1500,15 @@ export function getRoutineForDayRole(
   }
   if (role === "swim_performance") return getRoutineById("routine-swim-perf")!;
   if (role === "swim_recovery") return getRoutineById("routine-swim-rec")!;
+  if (role === "boxing") return getRoutineById("routine-boxing")!;
   if (role === "climbing") return getRoutineById("routine-climbing")!;
-  if (role === "recovery") return getRoutineById("routine-maintenance")!;
+  if (role === "recovery") return getRoutineById("routine-sunday-skills")!;
   const match = ROUTINES.find(
     (r) =>
       r.day_roles.includes(role) &&
       !r.id.startsWith("routine-wednesday") &&
       r.kind !== "swim" &&
+      r.kind !== "boxing" &&
       r.kind !== "climb",
   );
   if (!match) throw new Error(`No routine for role ${role}`);
