@@ -1,4 +1,4 @@
-import type { OnboardingDraft, ProgressionState } from "@/lib/types";
+import type { DayRole, OnboardingDraft, ProgressionState } from "@/lib/types";
 import { LOCAL_USER_ID } from "@/lib/types";
 
 export function uid(_prefix?: string): string {
@@ -93,7 +93,7 @@ export function readinessPercent(checkin: {
   );
 }
 
-export function defaultWeekdayMap(): Record<string, string | null> {
+export function defaultWeekdayMap(): Record<string, DayRole | null> {
   return {
     "0": "daily_skill_practice",
     "1": "strength_power",
