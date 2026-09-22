@@ -108,16 +108,37 @@ function liveSchedulePriority(session: ScheduledSession): number {
   return 40;
 }
 
+function scheduleSlot(session: ScheduledSession): "day" | "daily_skill" {
+  return session.day_role === "daily_skill_practice"
+    ? "daily_skill"
+    : "day";
+}
+
+function scheduleKey(session: ScheduledSession): string {
+  return `${session.date}:${scheduleSlot(session)}`;
+}
+
+function needsSeparateDailySkill(role: DayRole): boolean {
+  return (
+    role !== "daily_skill_practice" &&
+    role !== "recovery" &&
+    !isMainWorkoutRoleLocal(role)
+  );
+}
+
 /**
- * Historical missed/completed rows may coexist on a date, but only one live
- * calendar entry is allowed. This protects against duplicate rows with
- * different ids returning from older sync/reschedule logic.
+ * Historical rows may coexist on a date. For live rows, keep one entry per
+ * schedule slot: the day's main/mobility/sport card plus, when appropriate,
+ * one separate daily OAHS+planche card.
+ *
+ * A main workout already contains OAHS+planche, so any auxiliary daily-skill
+ * card on that date is removed as redundant.
  */
 export function canonicalizeLiveScheduleRows(
   rows: ScheduledSession[],
 ): ScheduledSession[] {
   const history: ScheduledSession[] = [];
-  const liveByDate = new Map<string, ScheduledSession>();
+  const liveByKey = new Map<string, ScheduledSession>();
 
   for (const raw of rows.map(normalizeScheduledSession)) {
     if (!LIVE_SCHEDULE_STATUSES.has(raw.status)) {
@@ -125,17 +146,34 @@ export function canonicalizeLiveScheduleRows(
       continue;
     }
 
-    const current = liveByDate.get(raw.date);
+    const key = scheduleKey(raw);
+    const current = liveByKey.get(key);
     if (
       !current ||
       liveSchedulePriority(raw) > liveSchedulePriority(current)
     ) {
-      liveByDate.set(raw.date, raw);
+      liveByKey.set(key, raw);
     }
   }
 
-  return [...history, ...liveByDate.values()].sort((a, b) =>
-    a.date.localeCompare(b.date),
+  const mainDates = new Set(
+    [...liveByKey.values()]
+      .filter((session) => isMainWorkoutRoleLocal(session.day_role))
+      .map((session) => session.date),
+  );
+
+  const live = [...liveByKey.values()].filter(
+    (session) =>
+      !(
+        session.day_role === "daily_skill_practice" &&
+        mainDates.has(session.date)
+      ),
+  );
+
+  return [...history, ...live].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      scheduleSlot(a).localeCompare(scheduleSlot(b)),
   );
 }
 
@@ -150,63 +188,140 @@ export function generateScheduledSessions(opts: {
   const existing = canonicalizeLiveScheduleRows(
     (opts.existing ?? []).map(normalizeScheduledSession),
   ).map((session) => {
-      if (
-        !session.generated_from_schedule ||
-        session.status !== "scheduled"
-      ) {
-        return session;
-      }
-      const cw = cycleWeekForDate(opts.cycle.start_date, session.date);
-      const wd = weekday(session.date);
-      const role = resolveDayRole(cw, wd, opts.weekdayMap);
-      const routine = getRoutineForDayRole(role, cw);
+    if (
+      !session.generated_from_schedule ||
+      session.status !== "scheduled"
+    ) {
+      return session;
+    }
+
+    const cw = cycleWeekForDate(opts.cycle.start_date, session.date);
+    const wd = weekday(session.date);
+    const baseRole = resolveDayRole(cw, wd, opts.weekdayMap);
+
+    if (session.day_role === "daily_skill_practice") {
+      const skillRoutine = getRoutineForDayRole(
+        "daily_skill_practice",
+        cw,
+      );
       return normalizeScheduledSession({
         ...session,
         cycle_week: cw,
-        day_role: role,
-        routine_template_id: routine.id,
+        day_role: "daily_skill_practice",
+        routine_template_id: skillRoutine.id,
         is_deload: cw === 4,
       });
+    }
+
+    const routine = getRoutineForDayRole(baseRole, cw);
+    return normalizeScheduledSession({
+      ...session,
+      cycle_week: cw,
+      day_role: baseRole,
+      routine_template_id: routine.id,
+      is_deload: cw === 4,
     });
-  const existingDates = new Set(existing.map((session) => session.date));
+  });
+
+  const existingLiveKeys = new Set(
+    existing
+      .filter((session) => LIVE_SCHEDULE_STATUSES.has(session.status))
+      .map(scheduleKey),
+  );
   const out: ScheduledSession[] = [...existing];
   const start = opts.cycle.start_date;
-  let sequence = Math.max(0, ...existing.map((s) => s.sequence_index), 0);
+  let sequence = Math.max(0, ...existing.map((row) => row.sequence_index), 0);
+
+  const makeScheduled = (
+    date: string,
+    cw: 1 | 2 | 3 | 4,
+    role: DayRole,
+    routineId: string,
+    sequenceIndex: number,
+  ): ScheduledSession =>
+    normalizeScheduledSession({
+      id: uid("sched"),
+      user_id: opts.userId,
+      date,
+      original_date: date,
+      routine_template_id: routineId,
+      cycle_week: cw,
+      cycle_number: opts.cycle.cycle_number,
+      day_role: role,
+      status: "scheduled",
+      generated_from_schedule: true,
+      completed_at: null,
+      reschedule_count: 0,
+      missed_reason: null,
+      sequence_index: sequenceIndex,
+      is_deload: cw === 4,
+      auto_rescheduled: false,
+      manually_rescheduled: false,
+      rescheduled_from_id: null,
+      missed_note: null,
+      injury_area: null,
+      injury_exercise: null,
+    });
 
   for (let i = 0; i < weeks * 7; i++) {
     const date = addDays(start, i);
-    if (existingDates.has(date)) continue;
     const cw = cycleWeekForDate(start, date);
     const wd = weekday(date);
     const role = resolveDayRole(cw, wd, opts.weekdayMap);
     const routine = getRoutineForDayRole(role, cw);
-    if (isMainWorkoutRoleLocal(role)) sequence += 1;
 
-    out.push(
-      normalizeScheduledSession({
-        id: uid("sched"),
-        user_id: opts.userId,
-        date,
-        original_date: date,
-        routine_template_id: routine.id,
-        cycle_week: cw,
-        cycle_number: opts.cycle.cycle_number,
-        day_role: role,
-        status: "scheduled",
-        generated_from_schedule: true,
-        completed_at: null,
-        reschedule_count: 0,
-        missed_reason: null,
-        sequence_index: isMainWorkoutRoleLocal(role) ? sequence : 0,
-        is_deload: cw === 4,
-        auto_rescheduled: false,
-        manually_rescheduled: false,
-        rescheduled_from_id: null,
-        missed_note: null,
-        injury_area: null,
-        injury_exercise: null,
-      }),
-    );
+    const dayKey = `${date}:day`;
+    const skillKey = `${date}:daily_skill`;
+
+    if (role === "daily_skill_practice") {
+      if (!existingLiveKeys.has(skillKey)) {
+        out.push(
+          makeScheduled(
+            date,
+            cw,
+            "daily_skill_practice",
+            routine.id,
+            0,
+          ),
+        );
+        existingLiveKeys.add(skillKey);
+      }
+      continue;
+    }
+
+    if (!existingLiveKeys.has(dayKey)) {
+      if (isMainWorkoutRoleLocal(role)) sequence += 1;
+      out.push(
+        makeScheduled(
+          date,
+          cw,
+          role,
+          routine.id,
+          isMainWorkoutRoleLocal(role) ? sequence : 0,
+        ),
+      );
+      existingLiveKeys.add(dayKey);
+    }
+
+    if (
+      needsSeparateDailySkill(role) &&
+      !existingLiveKeys.has(skillKey)
+    ) {
+      const skillRoutine = getRoutineForDayRole(
+        "daily_skill_practice",
+        cw,
+      );
+      out.push(
+        makeScheduled(
+          date,
+          cw,
+          "daily_skill_practice",
+          skillRoutine.id,
+          0,
+        ),
+      );
+      existingLiveKeys.add(skillKey);
+    }
   }
 
   return canonicalizeLiveScheduleRows(out);
