@@ -56,6 +56,28 @@ describe("adaptive schedule engine", () => {
     expect(classifySession(sun)).toBe("SKILL_PRACTICE");
   });
 
+  it("rotates boxing and swimming while keeping Sunday daily skills", () => {
+    const { sessions } = buildWeek();
+    const roleAt = (offset: number) =>
+      byDate(sessions, addDays(START, offset))?.day_role;
+
+    expect(roleAt(3)).toBe("boxing");
+    expect(roleAt(4)).toBe("short_recovery");
+    expect(roleAt(6)).toBe("daily_skill_practice");
+
+    expect(roleAt(10)).toBe("short_deep_flex");
+    expect(roleAt(11)).toBe("swim_performance");
+    expect(roleAt(13)).toBe("daily_skill_practice");
+
+    expect(roleAt(17)).toBe("boxing");
+    expect(roleAt(18)).toBe("short_recovery");
+    expect(roleAt(20)).toBe("daily_skill_practice");
+
+    expect(roleAt(24)).toBe("short_deep_flex");
+    expect(roleAt(25)).toBe("swim_recovery");
+    expect(roleAt(27)).toBe("daily_skill_practice");
+  });
+
   it("Monday main workout missed — shifts A then B with recovery gap", () => {
     const { cycle, sessions } = buildWeek();
     const mon = byDate(sessions, START)!;
