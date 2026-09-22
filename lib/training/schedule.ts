@@ -223,11 +223,10 @@ export function generateScheduledSessions(opts: {
     });
   });
 
-  const existingLiveKeys = new Set(
-    existing
-      .filter((session) => LIVE_SCHEDULE_STATUSES.has(session.status))
-      .map(scheduleKey),
-  );
+  // Any existing row occupies its schedule slot, including completed,
+  // missed or skipped rows. This prevents ensureSchedule() from recreating a
+  // card after the athlete has already completed or intentionally skipped it.
+  const existingKeys = new Set(existing.map(scheduleKey));
   const out: ScheduledSession[] = [...existing];
   const start = opts.cycle.start_date;
   let sequence = Math.max(0, ...existing.map((row) => row.sequence_index), 0);
@@ -274,7 +273,7 @@ export function generateScheduledSessions(opts: {
     const skillKey = `${date}:daily_skill`;
 
     if (role === "daily_skill_practice") {
-      if (!existingLiveKeys.has(skillKey)) {
+      if (!existingKeys.has(skillKey)) {
         out.push(
           makeScheduled(
             date,
@@ -284,12 +283,12 @@ export function generateScheduledSessions(opts: {
             0,
           ),
         );
-        existingLiveKeys.add(skillKey);
+        existingKeys.add(skillKey);
       }
       continue;
     }
 
-    if (!existingLiveKeys.has(dayKey)) {
+    if (!existingKeys.has(dayKey)) {
       if (isMainWorkoutRoleLocal(role)) sequence += 1;
       out.push(
         makeScheduled(
@@ -300,12 +299,12 @@ export function generateScheduledSessions(opts: {
           isMainWorkoutRoleLocal(role) ? sequence : 0,
         ),
       );
-      existingLiveKeys.add(dayKey);
+      existingKeys.add(dayKey);
     }
 
     if (
       needsSeparateDailySkill(role) &&
-      !existingLiveKeys.has(skillKey)
+      !existingKeys.has(skillKey)
     ) {
       const skillRoutine = getRoutineForDayRole(
         "daily_skill_practice",
@@ -320,7 +319,7 @@ export function generateScheduledSessions(opts: {
           0,
         ),
       );
-      existingLiveKeys.add(skillKey);
+      existingKeys.add(skillKey);
     }
   }
 
