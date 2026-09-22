@@ -13,6 +13,14 @@ export function applyDeloadToPrescription(
   // OAHS remains full
   if (item.exercise_slug === "oahs-practice") return p;
 
+  // The daily primer is already a deliberately light technique exposure.
+  if (
+    item.exercise_slug === "planche-hold" &&
+    prescription.extras?.daily_primer === true
+  ) {
+    return p;
+  }
+
   // Planche uses light protocol on every scheduled planche day in deload
   if (item.exercise_slug === "planche-hold") {
     p.protocol = "light";
