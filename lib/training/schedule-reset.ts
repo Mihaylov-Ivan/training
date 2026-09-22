@@ -7,7 +7,7 @@ import type {
 import { generateScheduledSessions } from "@/lib/training/schedule";
 import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
 
-export const CURRENT_SCHEDULE_RESET_VERSION = 2;
+export const CURRENT_SCHEDULE_RESET_VERSION = 3;
 
 export function buildFutureScheduleReset(opts: {
   userId: string;
