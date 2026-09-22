@@ -90,6 +90,7 @@ export type AdaptiveSessionKind =
   | "DAILY_MAINTENANCE"
   | "RUNNING"
   | "SWIMMING"
+  | "BOXING"
   | "CLIMBING"
   | "DELOAD_WORKOUT";
 
@@ -103,6 +104,7 @@ export type DayRole =
   | "short_recovery"
   | "swim_performance"
   | "swim_recovery"
+  | "boxing"
   | "calisthenics_volume"
   | "climbing"
   | "recovery";
@@ -168,7 +170,7 @@ export interface RoutineItemDef {
 export interface RoutineTemplateDef {
   id: string;
   name: string;
-  kind: "primary" | "short" | "maintenance" | "swim" | "climb" | "recovery";
+  kind: "primary" | "short" | "maintenance" | "swim" | "boxing" | "climb" | "recovery";
   default_duration_min: number;
   description: string;
   day_roles: DayRole[];
