@@ -96,8 +96,28 @@ export default function TodayPage() {
     // Never treat a missed/skipped row as today's startable workout
     return (
       actionable.find((s) => isPrimaryRole(s.day_role)) ??
-      actionable.find((s) => isShortRole(s.day_role)) ??
+      actionable.find(
+        (s) =>
+          isShortRole(s.day_role) &&
+          s.day_role !== "daily_skill_practice",
+      ) ??
+      actionable.find((s) => s.day_role !== "daily_skill_practice") ??
       actionable[0]
+    );
+  }, [scheduled, today]);
+
+  const todaySkillSched = useMemo(() => {
+    return scheduled.find(
+      (session) =>
+        session.date === today &&
+        session.day_role === "daily_skill_practice" &&
+        [
+          "scheduled",
+          "in_progress",
+          "completed",
+          "partially_completed",
+          "pending_missed_confirmation",
+        ].includes(session.status),
     );
   }, [scheduled, today]);
 
@@ -216,6 +236,39 @@ export default function TodayPage() {
     todayPrimary &&
     (todayPrimary.status === "active" || todayPrimary.status === "planned");
 
+  const todaySkillSession = useMemo(() => {
+    if (!todaySkillSched) return undefined;
+    return (
+      latestSessionForDay(trainingSessions, {
+        scheduledId: todaySkillSched.id,
+        day: today,
+      }) ??
+      trainingSessions
+        .filter(
+          (session) =>
+            session.scheduled_session_id === todaySkillSched.id,
+        )
+        .sort((a, b) => {
+          const aT = a.ended_at ?? a.started_at ?? "";
+          const bT = b.ended_at ?? b.started_at ?? "";
+          return bT.localeCompare(aT);
+        })[0]
+    );
+  }, [trainingSessions, todaySkillSched, today]);
+
+  const skillDone =
+    todaySkillSched?.status === "completed" ||
+    todaySkillSched?.status === "partially_completed" ||
+    todaySkillSession?.status === "completed" ||
+    (!!todaySkillSession &&
+      itemsAllFinished(todaySkillSession.id, sessionItems));
+
+  const skillInProgress =
+    !skillDone &&
+    todaySkillSession &&
+    (todaySkillSession.status === "active" ||
+      todaySkillSession.status === "planned");
+
   // Finalize sessions that finished all exercises but never hit "Done"
   useEffect(() => {
     if (
@@ -237,6 +290,16 @@ export default function TodayPage() {
     }
   }, [todayPrimary, sessionItems, completeSession]);
 
+  useEffect(() => {
+    if (
+      todaySkillSession &&
+      todaySkillSession.status !== "completed" &&
+      itemsAllFinished(todaySkillSession.id, sessionItems)
+    ) {
+      completeSession(todaySkillSession.id);
+    }
+  }, [todaySkillSession, sessionItems, completeSession]);
+
   const overdue =
     todaySched &&
     !primaryDone &&
@@ -253,6 +316,9 @@ export default function TodayPage() {
 
   const routine = todaySched
     ? getRoutineById(todaySched.routine_template_id)
+    : null;
+  const skillRoutine = todaySkillSched
+    ? getRoutineById(todaySkillSched.routine_template_id)
     : null;
 
   const [showCheckin, setShowCheckin] = useState(false);
@@ -433,7 +499,103 @@ export default function TodayPage() {
           </div>
         ) : null}
 
-        {todaySched && routine && todaySched.day_role !== "recovery" ? (
+        {todaySkillSched && skillRoutine ? (
+          <Card
+            className={
+              skillDone
+                ? "border-success/40 bg-success-soft/30"
+                : "border-success/30"
+            }
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide ${
+                    skillDone ? "text-success" : "text-success"
+                  }`}
+                >
+                  Daily skill practice
+                </p>
+                <h2 className="mt-1 text-lg font-semibold">
+                  {skillRoutine.name}
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  {skillDone
+                    ? "Completed today."
+                    : skillRoutine.description}
+                </p>
+              </div>
+              {skillDone ? (
+                <Badge tone="success">
+                  <span className="inline-flex items-center gap-1">
+                    <Check
+                      className="size-3.5"
+                      strokeWidth={3}
+                      aria-hidden
+                    />
+                    Done
+                  </span>
+                </Badge>
+              ) : (
+                <Badge tone={skillInProgress ? "warning" : "success"}>
+                  {skillInProgress
+                    ? "In progress"
+                    : formatDuration(skillRoutine.default_duration_min)}
+                </Badge>
+              )}
+            </div>
+
+            {skillDone && todaySkillSession ? (
+              <SecondaryButton
+                className="mt-4 w-full"
+                onClick={() =>
+                  router.push(
+                    `/session/${todaySkillSession.id}/summary`,
+                  )
+                }
+              >
+                View summary
+              </SecondaryButton>
+            ) : skillInProgress && todaySkillSession ? (
+              <div className="mt-4 space-y-2">
+                <PrimaryButton
+                  className="w-full"
+                  onClick={() =>
+                    router.push(`/session/${todaySkillSession.id}`)
+                  }
+                >
+                  Continue skill practice
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => beginManualMiss(todaySkillSched.id)}
+                >
+                  Skip today
+                </SecondaryButton>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-2">
+                <PrimaryButton
+                  className="w-full"
+                  onClick={() => launch(todaySkillSched.id)}
+                >
+                  Start skill practice
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-full"
+                  onClick={() => beginManualMiss(todaySkillSched.id)}
+                >
+                  Skip today
+                </SecondaryButton>
+              </div>
+            )}
+          </Card>
+        ) : null}
+
+        {todaySched &&
+        routine &&
+        todaySched.day_role !== "recovery" &&
+        todaySched.id !== todaySkillSched?.id ? (
           <Card
             className={
               primaryDone
@@ -451,7 +613,7 @@ export default function TodayPage() {
                   {todaySched.rescheduled_from_id || todaySched.auto_rescheduled
                     ? "Rescheduled session"
                     : routine.kind === "short"
-                      ? "Daily skill / mobility"
+                      ? "Mobility / flexibility"
                       : routine.kind === "swim"
                         ? "Swimming"
                         : routine.kind === "boxing"
@@ -537,7 +699,7 @@ export default function TodayPage() {
               workout.
             </p>
           </Card>
-        ) : todayMissed.length === 0 ? (
+        ) : todayMissed.length === 0 && !todaySkillSched ? (
           <Card>
             <p className="text-sm text-muted">
               No structured workout scheduled for today.
