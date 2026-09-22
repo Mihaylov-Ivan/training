@@ -297,13 +297,18 @@ function displaceShortOnDate(
   moves: ScheduleMove[],
   skipped: ScheduledSession[],
   merged: ScheduleMove[],
+  options: { preserveSkillPractice?: boolean } = {},
 ): ScheduledSession[] {
   let next = [...working];
   const blockers = next.filter(
     (s) =>
       s.date === date &&
       isActiveScheduled(s.status) &&
-      (isShortRole(s.day_role) || s.day_role === "recovery"),
+      (isShortRole(s.day_role) || s.day_role === "recovery") &&
+      !(
+        options.preserveSkillPractice &&
+        s.day_role === "daily_skill_practice"
+      ),
   );
 
   for (const short of blockers) {
@@ -614,6 +619,7 @@ export function recalculateSchedule(opts: {
       moves,
       skipped,
       merged,
+      { preserveSkillPractice: true },
     );
     const makeup = cloneAsMakeup(missed, target, cycle);
     working = [...working, makeup];
@@ -634,7 +640,7 @@ export function recalculateSchedule(opts: {
       skipped_sessions: skipped.concat(marked),
       merged_recovery_sessions: merged,
       warnings,
-      explanation: `${specialty} moved ${missed.date} → ${target}. Core workouts unchanged; any low-priority short session on the target day was skipped to avoid stacking.`,
+      explanation: `${specialty} moved ${missed.date} → ${target}. Daily OAHS + planche remains separate; other low-priority short work may be skipped to avoid stacking.`,
       recommendation: "apply",
     };
   }
