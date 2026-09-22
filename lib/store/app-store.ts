@@ -34,6 +34,10 @@ import {
   createActiveCycle,
   generateScheduledSessions,
 } from "@/lib/training/schedule";
+import {
+  buildFutureScheduleReset,
+  CURRENT_SCHEDULE_RESET_VERSION,
+} from "@/lib/training/schedule-reset";
 import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
 import { applyMinBetweenSetRest } from "@/lib/training/rest";
 import {
@@ -60,6 +64,7 @@ import {
   queueOrSync,
   syncProgressionStates,
   syncProfile,
+  deleteScheduledSessionsByIds,
   syncSchedulePrefs,
   syncScheduledSessions,
   syncTrainingSessionBundle,
@@ -127,6 +132,9 @@ export interface AppState {
   completeOnboarding: (draft: OnboardingDraft) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   ensureSchedule: () => void;
+  resetFutureSchedule: (
+    fromDate?: string,
+  ) => Promise<{ removed: number; scheduled: number }>;
   saveWellbeing: (data: Omit<WellbeingCheckin, "id" | "user_id">) => void;
   startSessionFromScheduled: (scheduledId: string) => string;
   startMaintenance: () => string;
@@ -366,6 +374,7 @@ export const useAppStore = create<AppState>()(
         const schedulePrefs: SchedulePreferences = {
           user_id: userId,
           weekday_map: draft.weekday_map,
+          schedule_reset_version: CURRENT_SCHEDULE_RESET_VERSION,
         };
         const cycle = createActiveCycle(userId);
         const scheduled = generateScheduledSessions({
@@ -415,6 +424,71 @@ export const useAppStore = create<AppState>()(
         });
         set({ scheduledSessions: next });
         queueOrSync(() => syncScheduledSessions(next));
+      },
+
+      resetFutureSchedule: async (fromDate = todayISO()) => {
+        const state = get();
+        const profile = state.profile;
+        const cycle =
+          state.cycles.find((candidate) => candidate.status === "active") ??
+          state.cycles[0];
+        if (!profile || !cycle) {
+          return { removed: 0, scheduled: state.scheduledSessions.length };
+        }
+
+        const userId = currentUserId(get);
+        const plan = buildFutureScheduleReset({
+          userId,
+          cycle,
+          weekdayMap: state.schedulePrefs?.weekday_map,
+          scheduledSessions: state.scheduledSessions,
+          trainingSessions: state.trainingSessions,
+          fromDate,
+          weeksAhead: 6,
+        });
+        const nextPrefs: SchedulePreferences = {
+          user_id: userId,
+          weekday_map:
+            state.schedulePrefs?.weekday_map ?? defaultWeekdayMap(),
+          schedule_reset_version: CURRENT_SCHEDULE_RESET_VERSION,
+        };
+
+        if (
+          isSupabaseConfigured() &&
+          userId !== LOCAL_USER_ID
+        ) {
+          if (
+            typeof navigator !== "undefined" &&
+            !navigator.onLine
+          ) {
+            throw new Error(
+              "Future schedule reset requires an internet connection so old cloud rows can be removed safely.",
+            );
+          }
+          await deleteScheduledSessionsByIds(userId, plan.removedIds);
+        }
+
+        set({
+          scheduledSessions: plan.scheduledSessions,
+          schedulePrefs: nextPrefs,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+        });
+
+        if (isSupabaseConfigured() && userId !== LOCAL_USER_ID) {
+          await syncScheduledSessions(plan.scheduledSessions);
+          await syncSchedulePrefs(nextPrefs);
+        }
+
+        return {
+          removed: plan.removedIds.length,
+          scheduled: plan.scheduledSessions.filter(
+            (session) =>
+              session.date >= fromDate &&
+              session.status === "scheduled",
+          ).length,
+        };
       },
 
       saveWellbeing: (data) => {
