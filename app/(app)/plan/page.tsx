@@ -47,10 +47,17 @@ function formatLongDate(iso: string) {
 }
 
 function roleTone(role: DayRole): string {
-  if (isPrimaryRole(role) && role !== "swim_performance" && role !== "swim_recovery") {
+  if (
+    isPrimaryRole(role) &&
+    role !== "swim_performance" &&
+    role !== "swim_recovery" &&
+    role !== "boxing"
+  ) {
     return "bg-accent";
   }
-  if (role.startsWith("swim") || role === "climbing") return "bg-warning";
+  if (role.startsWith("swim") || role === "boxing" || role === "climbing") {
+    return "bg-warning";
+  }
   if (isShortRole(role)) return "bg-success";
   return "bg-muted";
 }
