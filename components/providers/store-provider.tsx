@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store/app-store";
 import { LOCAL_USER_ID } from "@/lib/types";
+import { CURRENT_SCHEDULE_RESET_VERSION } from "@/lib/training/schedule-reset";
 import {
   createClient,
   isSupabaseConfigured,
@@ -13,6 +14,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const setHydrated = useAppStore((s) => s.setHydrated);
   const hydrated = useAppStore((s) => s.hydrated);
   const ensureSchedule = useAppStore((s) => s.ensureSchedule);
+  const resetFutureSchedule = useAppStore((s) => s.resetFutureSchedule);
   const profile = useAppStore((s) => s.profile);
   const setAuthUserId = useAppStore((s) => s.setAuthUserId);
   const hydrateFromCloud = useAppStore((s) => s.hydrateFromCloud);
@@ -133,11 +135,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   useEffect(() => {
-    if (hydrated && !bootstrapping && profile?.onboarding_complete) {
-      ensureSchedule();
-      useAppStore.getState().scanPendingMissedSessions();
-    }
-  }, [hydrated, bootstrapping, profile, ensureSchedule, authUserId]);
+    if (!hydrated || bootstrapping || !profile?.onboarding_complete) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const state = useAppStore.getState();
+      const resetVersion =
+        state.schedulePrefs?.schedule_reset_version ?? 0;
+
+      try {
+        if (resetVersion < CURRENT_SCHEDULE_RESET_VERSION) {
+          await resetFutureSchedule();
+        } else {
+          ensureSchedule();
+        }
+      } catch (err) {
+        console.error("[future schedule reset]", err);
+        // Do not mark the migration complete if cloud cleanup failed.
+        // A later app load will retry safely.
+      }
+
+      if (!cancelled) {
+        useAppStore.getState().scanPendingMissedSessions();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hydrated,
+    bootstrapping,
+    profile?.onboarding_complete,
+    profile?.user_id,
+    authUserId,
+    ensureSchedule,
+    resetFutureSchedule,
+  ]);
 
   if (!hydrated || bootstrapping) {
     return (
