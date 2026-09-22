@@ -30,8 +30,16 @@ function buildWeek() {
 }
 
 function byDate(sessions: ScheduledSession[], date: string) {
-  return sessions.find(
-    (s) => s.date === date && s.status === "scheduled",
+  return (
+    sessions.find(
+      (s) =>
+        s.date === date &&
+        s.status === "scheduled" &&
+        s.day_role !== "daily_skill_practice",
+    ) ??
+    sessions.find(
+      (s) => s.date === date && s.status === "scheduled",
+    )
   );
 }
 
