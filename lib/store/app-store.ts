@@ -739,6 +739,8 @@ export const useAppStore = create<AppState>()(
           metrics: {
             ...input.metrics,
             protocol: item.prescription_snapshot.protocol,
+            oahs_protocol:
+              item.prescription_snapshot.extras?.oahs_protocol,
             lever_protocol:
               item.prescription_snapshot.extras?.lever_protocol,
           },
@@ -1109,6 +1111,7 @@ export const useAppStore = create<AppState>()(
               "climbing",
               "swim_performance",
               "swim_recovery",
+              "boxing",
             ].includes(s.day_role),
           ) ?? pending[0];
         set({
