@@ -9,7 +9,7 @@ import { addDays, todayISO, uid, weekday } from "@/lib/utils";
 import { normalizeScheduledSession } from "@/lib/training/normalize-schedule";
 
 const BASE_ROLES: Record<number, DayRole> = {
-  0: "recovery",
+  0: "daily_skill_practice",
   1: "strength_power",
   2: "short_mobility_front",
   3: "athleticism_endurance",
@@ -24,8 +24,14 @@ export function resolveDayRole(
   weekdayMap?: SchedulePreferences["weekday_map"],
 ): DayRole {
   const mapped = weekdayMap?.[String(weekdayNum)];
-  const role =
+  let role =
     (mapped as DayRole | null | undefined) ?? BASE_ROLES[weekdayNum];
+
+  // Existing profiles may still store the old Sunday "recovery" role.
+  // Upgrade it to the daily skill-practice day so OAHS + planche remain daily.
+  if (weekdayNum === 0 && role === "recovery") {
+    role = "daily_skill_practice";
+  }
 
   // Occasional boxing replaces Thursday deep-flex in Weeks 1 and 3.
   // Friday remains a recovery day before Saturday unless it is a swim week.
@@ -173,7 +179,10 @@ export function isPrimaryRole(role: DayRole): boolean {
 }
 
 export function isShortRole(role: DayRole): boolean {
-  return ["short_mobility_front", "short_deep_flex", "short_recovery"].includes(
-    role,
-  );
+  return [
+    "short_mobility_front",
+    "short_deep_flex",
+    "short_recovery",
+    "daily_skill_practice",
+  ].includes(role);
 }
