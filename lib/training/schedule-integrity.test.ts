@@ -14,7 +14,11 @@ describe("schedule live-row integrity", () => {
       cycle,
       weeksAhead: 1,
     });
-    const tuesday = rows.find((row) => row.date === "2026-09-22")!;
+    const tuesday = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "short_mobility_front",
+    )!;
     const duplicate = normalizeScheduledSession({
       ...tuesday,
       id: "duplicate-tuesday",
@@ -47,7 +51,11 @@ describe("schedule live-row integrity", () => {
       cycle,
       weeksAhead: 1,
     });
-    const tuesday = rows.find((row) => row.date === "2026-09-22")!;
+    const tuesday = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "short_mobility_front",
+    )!;
     const movedStrength = normalizeScheduledSession({
       ...tuesday,
       id: "moved-strength",
@@ -78,14 +86,23 @@ describe("schedule live-row integrity", () => {
     expect(liveTuesday[0]!.id).toBe("moved-strength");
   });
 
-  it("allows terminal history alongside one live card", () => {
+  it("allows terminal history alongside the two intentional live cards", () => {
     const cycle = createActiveCycle("user-1", "2026-09-21");
     const rows = generateScheduledSessions({
       userId: "user-1",
       cycle,
       weeksAhead: 1,
     });
-    const tuesday = rows.find((row) => row.date === "2026-09-22")!;
+    const tuesday = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "short_mobility_front",
+    )!;
+    const skill = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "daily_skill_practice",
+    )!;
     const missedHistory = normalizeScheduledSession({
       ...tuesday,
       id: "missed-history",
@@ -95,6 +112,7 @@ describe("schedule live-row integrity", () => {
 
     const clean = canonicalizeLiveScheduleRows([
       tuesday,
+      skill,
       missedHistory,
     ]);
 
