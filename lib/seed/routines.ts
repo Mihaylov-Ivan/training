@@ -1374,9 +1374,9 @@ export const ROUTINES: RoutineTemplateDef[] = [
   withEstimatedDuration({
     id: "routine-sunday-skills",
     name: "Sunday — Light OAHS + Planche",
-    kind: "recovery",
+    kind: "short",
     description: "10-minute light skill primer · OAHS emphasis + planche",
-    day_roles: ["recovery"],
+    day_roles: ["daily_skill_practice"],
     items: sundaySkillItems,
   }),
   withEstimatedDuration({
@@ -1502,6 +1502,9 @@ export function getRoutineForDayRole(
   if (role === "swim_recovery") return getRoutineById("routine-swim-rec")!;
   if (role === "boxing") return getRoutineById("routine-boxing")!;
   if (role === "climbing") return getRoutineById("routine-climbing")!;
+  if (role === "daily_skill_practice") {
+    return getRoutineById("routine-sunday-skills")!;
+  }
   if (role === "recovery") return getRoutineById("routine-sunday-skills")!;
   const match = ROUTINES.find(
     (r) =>
