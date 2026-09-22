@@ -14,6 +14,8 @@ import { cycleWeekForDate, isShortRole } from "@/lib/training/schedule";
 import { normalizeScheduledSession } from "@/lib/training/normalize-schedule";
 
 export const MIN_MAIN_SESSION_GAP = 1;
+export const MAX_MAIN_WORKOUTS_PER_DAY = 1;
+export const MAX_MAIN_WORKOUTS_PER_CALENDAR_WEEK = 4;
 
 const MAIN_ROLES: DayRole[] = [
   "strength_power",
@@ -27,6 +29,15 @@ const ACTIVE_STATUSES = new Set([
   "in_progress",
   "pending_missed_confirmation",
   "overdue",
+]);
+
+const MAIN_LOAD_STATUSES = new Set<ScheduledSession["status"]>([
+  "scheduled",
+  "in_progress",
+  "pending_missed_confirmation",
+  "overdue",
+  "completed",
+  "partially_completed",
 ]);
 
 export function classifySession(
@@ -79,15 +90,100 @@ function sortByDate(sessions: ScheduledSession[]): ScheduledSession[] {
   return [...sessions].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function countsTowardMainLoad(session: ScheduledSession): boolean {
+  return (
+    isMainWorkoutRole(session.day_role) &&
+    MAIN_LOAD_STATUSES.has(session.status)
+  );
+}
+
+function calendarWeekStart(date: string): string {
+  const wd = weekday(date);
+  const daysFromMonday = wd === 0 ? 6 : wd - 1;
+  return addDays(date, -daysFromMonday);
+}
+
+function mainCountOnDate(
+  sessions: ScheduledSession[],
+  date: string,
+  exceptIds: Set<string> = new Set(),
+): number {
+  return sessions.filter(
+    (session) =>
+      !exceptIds.has(session.id) &&
+      session.date === date &&
+      countsTowardMainLoad(session),
+  ).length;
+}
+
+function mainCountInCalendarWeek(
+  sessions: ScheduledSession[],
+  date: string,
+  exceptIds: Set<string> = new Set(),
+): number {
+  const weekStart = calendarWeekStart(date);
+  const weekEnd = addDays(weekStart, 6);
+  return sessions.filter(
+    (session) =>
+      !exceptIds.has(session.id) &&
+      session.date >= weekStart &&
+      session.date <= weekEnd &&
+      countsTowardMainLoad(session),
+  ).length;
+}
+
+export function respectsMainWorkoutBoundaries(
+  sessions: ScheduledSession[],
+): boolean {
+  const dayCounts = new Map<string, number>();
+  const weekCounts = new Map<string, number>();
+
+  for (const session of sessions) {
+    if (!countsTowardMainLoad(session)) continue;
+    dayCounts.set(session.date, (dayCounts.get(session.date) ?? 0) + 1);
+    const week = calendarWeekStart(session.date);
+    weekCounts.set(week, (weekCounts.get(week) ?? 0) + 1);
+  }
+
+  return (
+    [...dayCounts.values()].every(
+      (count) => count <= MAX_MAIN_WORKOUTS_PER_DAY,
+    ) &&
+    [...weekCounts.values()].every(
+      (count) => count <= MAX_MAIN_WORKOUTS_PER_CALENDAR_WEEK,
+    )
+  );
+}
+
+function canPlaceMainOnDate(
+  candidate: string,
+  sessions: ScheduledSession[],
+  exceptIds: Set<string> = new Set(),
+): boolean {
+  if (
+    mainCountOnDate(sessions, candidate, exceptIds) >=
+    MAX_MAIN_WORKOUTS_PER_DAY
+  ) {
+    return false;
+  }
+  if (
+    mainCountInCalendarWeek(sessions, candidate, exceptIds) >=
+    MAX_MAIN_WORKOUTS_PER_CALENDAR_WEEK
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function occupiedDates(
   sessions: ScheduledSession[],
   exceptIds: Set<string> = new Set(),
 ): Set<string> {
   const set = new Set<string>();
-  for (const s of sessions) {
-    if (exceptIds.has(s.id)) continue;
-    if (!isActiveScheduled(s.status)) continue;
-    if (isMainWorkoutRole(s.day_role)) set.add(s.date);
+  for (const session of sessions) {
+    if (exceptIds.has(session.id)) continue;
+    if (!countsTowardMainLoad(session)) continue;
+    set.add(session.date);
   }
   return set;
 }
@@ -142,6 +238,7 @@ function findNextMainSlot(opts: {
       if (wd !== 0 && wd !== 6) continue;
     }
 
+    if (!canPlaceMainOnDate(date, opts.sessions, except)) continue;
     if (!hasMainGap(date, mains)) continue;
     return date;
   }
@@ -538,8 +635,21 @@ export function recalculateSchedule(opts: {
   if (kind === "CLIMBING") {
     const marked = markTerminal(missed, "missed", reason);
     let working = all.map((s) => (s.id === missed.id ? marked : s));
+    const manualTarget =
+      opts.manualTargetDate &&
+      canPlaceMainOnDate(
+        opts.manualTargetDate,
+        working,
+        new Set([missed.id]),
+      ) &&
+      hasMainGap(
+        opts.manualTargetDate,
+        occupiedDates(working, new Set([missed.id])),
+      )
+        ? opts.manualTargetDate
+        : null;
     const target =
-      opts.manualTargetDate ??
+      manualTarget ??
       findNextMainSlot({
         fromDate: missed.date,
         sessions: working,
@@ -548,8 +658,25 @@ export function recalculateSchedule(opts: {
         preferWeekend: true,
         maxLookahead: 14,
         sourceWeek: missed.cycle_week,
-      }) ??
-      addDays(missed.date, 1);
+      });
+
+    if (!target) {
+      return {
+        id: proposalId,
+        missed_session_id: missed.id,
+        reason,
+        updated_sessions: working,
+        moved_sessions: [],
+        skipped_sessions: [marked],
+        merged_recovery_sessions: [],
+        warnings: warnings.concat([
+          "No slot satisfies the one-main-workout-per-day, recovery-gap, and four-main-workouts-per-week limits.",
+        ]),
+        explanation:
+          "Climbing skipped rather than overloading the day or calendar week.",
+        recommendation: "skip_and_resume",
+      };
+    }
 
     working = displaceShortOnDate(
       working,
@@ -580,31 +707,52 @@ export function recalculateSchedule(opts: {
           isActiveScheduled(s.status),
       );
       if (strength) {
-        const tue = addDays(monday, 1);
-        working = displaceShortOnDate(
-          working,
-          tue,
+        const strengthTarget = findNextMainSlot({
+          fromDate: monday,
+          sessions: working,
           cycle,
-          moves,
-          skipped,
-          merged,
-        );
-        const strengthMissed = markTerminal(strength, "missed", null);
-        const strengthMakeup = cloneAsMakeup(strength, tue, cycle);
-        working = working
-          .map((s) => (s.id === strength.id ? strengthMissed : s))
-          .concat(strengthMakeup);
-        moves.push({
-          from_date: monday,
-          to_date: tue,
-          session_id: strengthMakeup.id,
-          day_role: strength.day_role,
-          routine_template_id: strength.routine_template_id,
-          label: sessionLabel(strength),
+          exceptIds: new Set([strength.id]),
+          maxLookahead: 7,
+          sourceWeek: strength.cycle_week,
+          allowDeloadWeek: strength.cycle_week === 4,
         });
-        warnings.push(
-          "Monday Strength shifted to Tuesday to protect recovery after Sunday climbing.",
+        const strengthMissed = markTerminal(strength, "missed", null);
+        working = working.map((session) =>
+          session.id === strength.id ? strengthMissed : session,
         );
+
+        if (strengthTarget) {
+          working = displaceShortOnDate(
+            working,
+            strengthTarget,
+            cycle,
+            moves,
+            skipped,
+            merged,
+          );
+          const strengthMakeup = cloneAsMakeup(
+            strength,
+            strengthTarget,
+            cycle,
+          );
+          working = working.concat(strengthMakeup);
+          moves.push({
+            from_date: monday,
+            to_date: strengthTarget,
+            session_id: strengthMakeup.id,
+            day_role: strength.day_role,
+            routine_template_id: strength.routine_template_id,
+            label: sessionLabel(strength),
+          });
+          warnings.push(
+            `Monday Strength shifted to ${strengthTarget} to protect recovery after Sunday climbing.`,
+          );
+        } else {
+          skipped.push(strengthMissed);
+          warnings.push(
+            "Monday Strength could not be moved without breaking the main-workout limits, so it was skipped.",
+          );
+        }
       }
     }
 
@@ -754,10 +902,33 @@ export function recalculateSchedule(opts: {
       }
     }
 
-    const target =
-      isFirst && opts.manualTargetDate
+    const manualMainTarget =
+      isFirst &&
+      opts.manualTargetDate &&
+      canPlaceMainOnDate(
+        opts.manualTargetDate,
+        working,
+        new Set([session.id, missed.id]),
+      ) &&
+      hasMainGap(
+        opts.manualTargetDate,
+        occupiedDates(
+          working,
+          new Set([session.id, missed.id]),
+        ),
+      )
         ? opts.manualTargetDate
-        : findNextMainSlot({
+        : null;
+
+    if (isFirst && opts.manualTargetDate && !manualMainTarget) {
+      warnings.push(
+        "Requested target rejected: it would break the one-main-per-day, recovery-gap, or four-main-per-week boundary.",
+      );
+    }
+
+    const target =
+      manualMainTarget ??
+      findNextMainSlot({
             fromDate: isFirst ? missed.date : cursor,
             sessions: working,
             cycle,
@@ -850,6 +1021,27 @@ export function recalculateSchedule(opts: {
     lines.length > 0
       ? `Schedule adjusted to preserve A→B→C order and recovery gaps.\n${lines.join("\n")}`
       : "No moves required.";
+
+  if (!respectsMainWorkoutBoundaries(working)) {
+    warnings.push(
+      "Automatic reschedule cancelled because it would exceed a hard main-workout load boundary.",
+    );
+    return {
+      id: proposalId,
+      missed_session_id: missed.id,
+      reason,
+      updated_sessions: all.map((session) =>
+        session.id === missed.id ? marked : session,
+      ),
+      moved_sessions: [],
+      skipped_sessions: [marked],
+      merged_recovery_sessions: [],
+      warnings,
+      explanation:
+        "Missed main workout skipped rather than creating more than one main workout in a day or more than four in a calendar week.",
+      recommendation: "skip_and_resume",
+    };
+  }
 
   // Saturday special: offer skip alternative via recommendation when squeeze is bad
   let recommendation: ScheduleAdjustmentProposal["recommendation"] = "apply";
