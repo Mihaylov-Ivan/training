@@ -74,7 +74,7 @@ describe("future schedule reset", () => {
     expect(activeSep23[0]!.day_role).toBe("athleticism_endurance");
   });
 
-  it("preserves historical terminal rows while allowing a fresh future session", () => {
+  it("removes future missed/skipped schedule-only history and regenerates a clean day", () => {
     const cycle = createActiveCycle("user-1", START);
     const normal = generateScheduledSessions({
       userId: "user-1",
@@ -100,9 +100,10 @@ describe("future schedule reset", () => {
       weeksAhead: 4,
     });
 
+    expect(result.removedIds).toContain("history-missed");
     expect(
-      result.scheduledSessions.find((row) => row.id === "history-missed")?.status,
-    ).toBe("missed");
+      result.scheduledSessions.find((row) => row.id === "history-missed"),
+    ).toBeUndefined();
     expect(
       result.scheduledSessions.filter(
         (row) => row.date === "2026-09-23" && row.status === "scheduled",
