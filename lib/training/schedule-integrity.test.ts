@@ -7,7 +7,7 @@ import {
 import { normalizeScheduledSession } from "@/lib/training/normalize-schedule";
 
 describe("schedule live-row integrity", () => {
-  it("keeps only one live scheduled card per date", () => {
+  it("keeps only one live card per schedule slot while allowing separate daily skills", () => {
     const cycle = createActiveCycle("user-1", "2026-09-21");
     const rows = generateScheduledSessions({
       userId: "user-1",
@@ -22,11 +22,20 @@ describe("schedule live-row integrity", () => {
 
     const clean = canonicalizeLiveScheduleRows([...rows, duplicate]);
 
+    const liveTuesday = clean.filter(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.status === "scheduled",
+    );
+    expect(liveTuesday).toHaveLength(2);
     expect(
-      clean.filter(
-        (row) =>
-          row.date === "2026-09-22" &&
-          row.status === "scheduled",
+      liveTuesday.filter(
+        (row) => row.day_role === "short_mobility_front",
+      ),
+    ).toHaveLength(1);
+    expect(
+      liveTuesday.filter(
+        (row) => row.day_role === "daily_skill_practice",
       ),
     ).toHaveLength(1);
   });
@@ -49,8 +58,14 @@ describe("schedule live-row integrity", () => {
       original_date: "2026-09-21",
     });
 
+    const skill = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "daily_skill_practice",
+    )!;
     const clean = canonicalizeLiveScheduleRows([
       tuesday,
+      skill,
       movedStrength,
     ]);
 
@@ -89,7 +104,7 @@ describe("schedule live-row integrity", () => {
           row.date === "2026-09-22" &&
           row.status === "scheduled",
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(
       clean.find((row) => row.id === "missed-history")?.status,
     ).toBe("missed");
