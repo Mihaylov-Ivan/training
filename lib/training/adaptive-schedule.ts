@@ -36,6 +36,7 @@ export function classifySession(
   const deload = session.is_deload || session.cycle_week === 4;
 
   if (role === "climbing") return "CLIMBING";
+  if (role === "boxing") return "BOXING";
   if (role === "swim_performance" || role === "swim_recovery") return "SWIMMING";
   if (role === "short_deep_flex") return "DEEP_FLEXIBILITY";
   if (
@@ -460,8 +461,9 @@ export function recalculateSchedule(opts: {
     };
   }
 
-  // Swimming: find low-load slot in next 7 days; never displace core
-  if (kind === "SWIMMING") {
+  // Swimming / boxing: find a low-load slot in the next 7 days; never displace core.
+  if (kind === "SWIMMING" || kind === "BOXING") {
+    const specialty = kind === "BOXING" ? "Boxing" : "Swimming";
     const marked = markTerminal(missed, "missed", reason);
     let working = all.map((s) => (s.id === missed.id ? marked : s));
     let target: string | null = opts.manualTargetDate ?? null;
@@ -501,9 +503,9 @@ export function recalculateSchedule(opts: {
         skipped_sessions: [skippedSwim],
         merged_recovery_sessions: [],
         warnings: [
-          "No suitable swim slot found without displacing a core workout.",
+          `No suitable ${specialty.toLowerCase()} slot found without displacing a core workout.`,
         ],
-        explanation: "Swim skipped — core sessions take priority.",
+        explanation: `${specialty} skipped — core sessions take priority.`,
         recommendation: "skip_and_resume",
       };
     }
@@ -526,7 +528,7 @@ export function recalculateSchedule(opts: {
       skipped_sessions: [marked],
       merged_recovery_sessions: [],
       warnings,
-      explanation: `Swim moved ${missed.date} → ${target}. Core workouts unchanged.`,
+      explanation: `${specialty} moved ${missed.date} → ${target}. Core workouts unchanged.`,
       recommendation: "apply",
     };
   }
