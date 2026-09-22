@@ -269,7 +269,15 @@ export const useAppStore = create<AppState>()(
 
         set({
           profile: local.profile,
-          schedulePrefs: local.schedulePrefs ?? snapshot.schedulePrefs,
+          schedulePrefs: local.schedulePrefs
+            ? {
+                ...local.schedulePrefs,
+                schedule_reset_version: Math.max(
+                  local.schedulePrefs.schedule_reset_version ?? 0,
+                  snapshot.schedulePrefs?.schedule_reset_version ?? 0,
+                ),
+              }
+            : snapshot.schedulePrefs,
           cycles: mergeById(snapshot.cycles, local.cycles),
           scheduledSessions: normalizeScheduledSessions(
             mergeById(snapshot.scheduledSessions, local.scheduledSessions),
