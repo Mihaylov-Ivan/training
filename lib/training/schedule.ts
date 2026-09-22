@@ -27,8 +27,9 @@ export function resolveDayRole(
   const role =
     (mapped as DayRole | null | undefined) ?? BASE_ROLES[weekdayNum];
 
-  // Friday swim substitutions
+  // Friday specialty rotation: boxing and swimming remain occasional.
   if (weekdayNum === 5 || role === "short_recovery") {
+    if (cycleWeek === 1 || cycleWeek === 3) return "boxing";
     if (cycleWeek === 2) return "swim_performance";
     if (cycleWeek === 4) return "swim_recovery";
   }
@@ -86,8 +87,28 @@ export function generateScheduledSessions(opts: {
   existing?: ScheduledSession[];
 }): ScheduledSession[] {
   const weeks = opts.weeksAhead ?? 6;
-  const existing = (opts.existing ?? []).map(normalizeScheduledSession);
-  const existingDates = new Set(existing.map((s) => s.date));
+  const existing = (opts.existing ?? [])
+    .map(normalizeScheduledSession)
+    .map((session) => {
+      if (
+        !session.generated_from_schedule ||
+        session.status !== "scheduled"
+      ) {
+        return session;
+      }
+      const cw = cycleWeekForDate(opts.cycle.start_date, session.date);
+      const wd = weekday(session.date);
+      const role = resolveDayRole(cw, wd, opts.weekdayMap);
+      const routine = getRoutineForDayRole(role, cw);
+      return normalizeScheduledSession({
+        ...session,
+        cycle_week: cw,
+        day_role: role,
+        routine_template_id: routine.id,
+        is_deload: cw === 4,
+      });
+    });
+  const existingDates = new Set(existing.map((session) => session.date));
   const out: ScheduledSession[] = [...existing];
   const start = opts.cycle.start_date;
   let sequence = Math.max(0, ...existing.map((s) => s.sequence_index), 0);
@@ -139,6 +160,7 @@ export function isPrimaryRole(role: DayRole): boolean {
     "climbing",
     "swim_performance",
     "swim_recovery",
+    "boxing",
   ].includes(role);
 }
 
