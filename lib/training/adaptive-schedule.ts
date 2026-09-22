@@ -607,6 +607,14 @@ export function recalculateSchedule(opts: {
         recommendation: "skip_and_resume",
       };
     }
+    working = displaceShortOnDate(
+      working,
+      target,
+      cycle,
+      moves,
+      skipped,
+      merged,
+    );
     const makeup = cloneAsMakeup(missed, target, cycle);
     working = [...working, makeup];
     moves.push({
@@ -623,10 +631,10 @@ export function recalculateSchedule(opts: {
       reason,
       updated_sessions: sortByDate(working),
       moved_sessions: moves,
-      skipped_sessions: [marked],
-      merged_recovery_sessions: [],
+      skipped_sessions: skipped.concat(marked),
+      merged_recovery_sessions: merged,
       warnings,
-      explanation: `${specialty} moved ${missed.date} → ${target}. Core workouts unchanged.`,
+      explanation: `${specialty} moved ${missed.date} → ${target}. Core workouts unchanged; any low-priority short session on the target day was skipped to avoid stacking.`,
       recommendation: "apply",
     };
   }
