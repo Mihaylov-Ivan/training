@@ -758,6 +758,28 @@ export const EXERCISES: ExerciseDef[] = [
     common_mistakes: ["Leaning back excessively"],
   },
   {
+    id: "ex-swim-session",
+    slug: "swimming-session",
+    name: "Swimming",
+    category: "swim",
+    metric_type: "duration",
+    instructions:
+      "Swim for the prescribed duration. Choose the session content yourself.",
+    cues: ["Use the session structure you want", "Keep effort appropriate for the day"],
+    common_mistakes: ["Extending the session far beyond the prescribed duration when fatigued"],
+  },
+  {
+    id: "ex-boxing-session",
+    slug: "boxing-session",
+    name: "Boxing",
+    category: "conditioning",
+    metric_type: "duration",
+    instructions:
+      "Box for the prescribed duration. Choose the session content yourself.",
+    cues: ["Use your own boxing session", "Keep quality high rather than chasing fatigue"],
+    common_mistakes: ["Turning every session into maximal conditioning"],
+  },
+  {
     id: "ex-easy-free",
     slug: "easy-freestyle",
     name: "Easy freestyle",
