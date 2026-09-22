@@ -48,7 +48,9 @@ export async function syncSchedulePrefs(prefs: SchedulePreferences) {
     {
       user_id: prefs.user_id,
       weekday_map: prefs.weekday_map,
-      reminder_preferences: {},
+      reminder_preferences: {
+        schedule_reset_version: prefs.schedule_reset_version ?? 0,
+      },
     },
     { onConflict: "user_id" },
   );
@@ -69,6 +71,24 @@ export async function syncCycles(cycles: TrainingCycle[]) {
     })),
   );
   if (error) throw error;
+}
+
+export async function deleteScheduledSessionsByIds(
+  userId: string,
+  ids: string[],
+) {
+  if (ids.length === 0) return;
+  const supabase = createClient();
+  const chunk = 100;
+  for (let i = 0; i < ids.length; i += chunk) {
+    const slice = ids.slice(i, i + chunk);
+    const { error } = await supabase
+      .from("scheduled_sessions")
+      .delete()
+      .eq("user_id", userId)
+      .in("id", slice);
+    if (error) throw error;
+  }
 }
 
 export async function syncScheduledSessions(rows: ScheduledSession[]) {
@@ -383,6 +403,9 @@ export async function loadCloudSnapshot(
       ? {
           user_id: prefsRes.data.user_id,
           weekday_map: prefsRes.data.weekday_map,
+          schedule_reset_version: Number(
+            prefsRes.data.reminder_preferences?.schedule_reset_version ?? 0,
+          ),
         }
       : null,
     cycles: (cyclesRes.data ?? []) as TrainingCycle[],
