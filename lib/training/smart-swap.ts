@@ -21,8 +21,15 @@ import {
   weekday,
 } from "@/lib/utils";
 
-const ACTIVE = new Set<ScheduledSession["status"]>([
+const ADJUSTABLE = new Set<ScheduledSession["status"]>([
   "scheduled",
+  "pending_missed_confirmation",
+  "overdue",
+]);
+
+const LIVE = new Set<ScheduledSession["status"]>([
+  "scheduled",
+  "in_progress",
   "pending_missed_confirmation",
   "overdue",
 ]);
@@ -145,7 +152,7 @@ function scheduledSkillForDate(
     (session) =>
       session.date === date &&
       session.day_role === "daily_skill_practice" &&
-      ACTIVE.has(session.status),
+      LIVE.has(session.status),
   );
 }
 
@@ -168,7 +175,7 @@ function baseForDate(
     (session) =>
       session.date === date &&
       session.day_role !== "daily_skill_practice" &&
-      ACTIVE.has(session.status),
+      LIVE.has(session.status),
   );
 }
 
@@ -402,12 +409,18 @@ function rebalanceMain(
   target: ScheduledSession,
   sessions: ScheduledSession[],
   cycle: TrainingCycle,
+  checkins: WellbeingCheckin[],
 ): SmartScheduleResult {
+  const readiness = readinessPercent(
+    latestRelevantCheckin(checkins, target.date),
+  );
+  const reason =
+    readiness != null && readiness < 55 ? "fatigue" : "no_time";
   const proposal = recalculateSchedule({
     missedSession: target,
     upcomingSessions: sessions,
     cycle,
-    reason: "no_time",
+    reason,
   });
 
   if (
@@ -512,7 +525,7 @@ function swapOrdinary(
       (candidate) =>
         candidate.id !== target.id &&
         candidate.day_role !== "daily_skill_practice" &&
-        ACTIVE.has(candidate.status) &&
+        ADJUSTABLE.has(candidate.status) &&
         inSameCalendarWeek(candidate.date, target.date) &&
         candidate.date >= today &&
         !SPECIAL_ROLES.has(candidate.day_role) &&
@@ -605,7 +618,7 @@ export function smartAdjustScheduledSession(opts: {
     };
   }
 
-  if (!ACTIVE.has(target.status)) {
+  if (!ADJUSTABLE.has(target.status)) {
     return {
       changed: false,
       updated_sessions: opts.sessions,
@@ -645,7 +658,12 @@ export function smartAdjustScheduledSession(opts: {
   }
 
   if (isMainWorkoutRole(target.day_role)) {
-    return rebalanceMain(target, opts.sessions, opts.cycle);
+    return rebalanceMain(
+      target,
+      opts.sessions,
+      opts.cycle,
+      opts.wellbeingCheckins,
+    );
   }
 
   return swapOrdinary(
