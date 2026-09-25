@@ -52,6 +52,10 @@ import {
   recalculateSchedule,
 } from "@/lib/training/adaptive-schedule";
 import { snapshotSession } from "@/lib/training/snapshot";
+import {
+  smartAdjustScheduledSession as buildSmartScheduleAdjustment,
+  type SmartScheduleResult,
+} from "@/lib/training/smart-swap";
 import { getRoutineById } from "@/lib/seed/routines";
 import {
   evaluateProgression,
@@ -187,6 +191,7 @@ export interface AppState {
     reason?: MissReason | null,
   ) => void;
   moveScheduledSession: (scheduledId: string, toDate: string) => void;
+  smartAdjustScheduledSession: (scheduledId: string) => SmartScheduleResult;
   skipScheduledSession: (
     scheduledId: string,
     reason?: MissReason | null,
@@ -1460,6 +1465,62 @@ export const useAppStore = create<AppState>()(
           missPromptMode: null,
         });
         queueOrSync(() => syncScheduledSessions(updated));
+      },
+
+      smartAdjustScheduledSession: (scheduledId) => {
+        const cycle =
+          get().cycles.find((candidate) => candidate.status === "active") ??
+          get().cycles[0];
+        const sessions = normalizeScheduledSessions(
+          get().scheduledSessions,
+        );
+
+        if (!cycle) {
+          return {
+            changed: false,
+            updated_sessions: sessions,
+            explanation: "No active training cycle is available.",
+            action: "none",
+          };
+        }
+
+        const result = buildSmartScheduleAdjustment({
+          scheduledId,
+          sessions,
+          cycle,
+          wellbeingCheckins: get().wellbeingCheckins,
+          today: todayISO(),
+        });
+
+        if (!result.changed) return result;
+
+        const nextIds = new Set(
+          result.updated_sessions.map((session) => session.id),
+        );
+        const removedIds = sessions
+          .filter((session) => !nextIds.has(session.id))
+          .map((session) => session.id);
+
+        set({
+          scheduledSessions: result.updated_sessions,
+          pendingAdjustment: null,
+          pendingMissedSessionId: null,
+          missPromptMode: null,
+        });
+
+        queueOrSync(async () => {
+          const userId = currentUserId(get);
+          if (
+            removedIds.length > 0 &&
+            isSupabaseConfigured() &&
+            userId !== LOCAL_USER_ID
+          ) {
+            await deleteScheduledSessionsByIds(userId, removedIds);
+          }
+          await syncScheduledSessions(result.updated_sessions);
+        });
+
+        return result;
       },
 
       skipScheduledSession: (scheduledId, reason = null) => {
