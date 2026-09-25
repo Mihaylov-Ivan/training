@@ -1200,6 +1200,117 @@ const boxingItems: RoutineItemDef[] = [
 ];
 
 resetSeq();
+const gymReplacementItems: RoutineItemDef[] = [
+  item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: {
+      sets: 1,
+      reps_per_set: 10,
+      rest_seconds: 0,
+      extras: { forward: 10, lateral: 10 },
+    },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-push-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-pull-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 8, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  oahsItem(4),
+  plancheItem(5, "medium"),
+  item({
+    exercise_slug: "weighted-pull-up",
+    block: "strength",
+    prescription: {
+      sets: 4,
+      reps_per_set: 5,
+      load_kg: 20,
+      rest_seconds: 150,
+    },
+    rest_seconds: 150,
+    load_from_state: true,
+    progression_rule_code: "WEIGHTED_PULLUP_4X5_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "handstand-push-up",
+    block: "strength",
+    prescription: {
+      sets: 4,
+      reps_per_set: 5,
+      exercise_level: "wall",
+      rest_seconds: 150,
+    },
+    rest_seconds: 150,
+    level_from_state: true,
+    progression_rule_code: "HSPU_LEVEL_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "bulgarian-split-squat",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 8,
+      load_kg: 0,
+      per_side: true,
+      rest_seconds: 90,
+      notes: "90 sec after both legs",
+    },
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "BULGARIAN_SPLIT_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "single-leg-rdl",
+    block: "posterior",
+    prescription: {
+      sets: 3,
+      reps_per_set: 8,
+      load_kg: 0,
+      per_side: true,
+      rest_seconds: 90,
+      tempo: "3-sec controlled eccentric",
+      notes: "Complete left and right before the set rest",
+    },
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "SINGLE_LEG_RDL_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "hanging-straight-leg-raise",
+    block: "core",
+    prescription: { sets: 3, reps_per_set: 10, rest_seconds: 60 },
+    rest_seconds: 60,
+    progression_rule_code: "HANGING_SLR_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "front-split",
+    block: "flexibility",
+    prescription: {
+      sets: 1,
+      hold_seconds: 45,
+      per_side: true,
+      rest_seconds: 15,
+    },
+    rest_seconds: 15,
+    progression_rule_code: "FRONT_SPLIT_V1",
+    progression_scope: "global_skill",
+  }),
+];
+
+resetSeq();
 const dailySkillItems: RoutineItemDef[] = [
   ...dailySkillPrimerItems(),
 ];
@@ -1455,6 +1566,15 @@ export const ROUTINES: RoutineTemplateDef[] = [
     items: swimRecItems,
   }),
   withEstimatedDuration({
+    id: "routine-gym-replacement",
+    name: "Gym replacement — Full body",
+    kind: "primary",
+    description:
+      "Automatic venue-safe replacement · OAHS + planche + balanced full-body strength",
+    day_roles: ["gym_workout"],
+    items: gymReplacementItems,
+  }),
+  withEstimatedDuration({
     id: "routine-boxing",
     name: "Thursday — Boxing · 45 min",
     kind: "boxing",
@@ -1495,6 +1615,9 @@ export function getRoutineForDayRole(
   if (role === "swim_performance") return getRoutineById("routine-swim-perf")!;
   if (role === "swim_recovery") return getRoutineById("routine-swim-rec")!;
   if (role === "boxing") return getRoutineById("routine-boxing")!;
+  if (role === "gym_workout") {
+    return getRoutineById("routine-gym-replacement")!;
+  }
   if (role === "climbing") return getRoutineById("routine-climbing")!;
   if (role === "daily_skill_practice") {
     return getRoutineById("routine-sunday-skills")!;
