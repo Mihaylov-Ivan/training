@@ -1596,7 +1596,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-boxing",
-    name: "Thursday — Boxing · 45 min",
+    name: "Boxing · 45 min",
     kind: "boxing",
     description: "45 minutes boxing · daily OAHS + planche is a separate session",
     day_roles: ["boxing"],
