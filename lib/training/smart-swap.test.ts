@@ -90,6 +90,14 @@ describe("smart schedule adjustment", () => {
       ),
     ).toBe(false);
     expect(respectsMainWorkoutBoundaries(result.updated_sessions)).toBe(true);
+    expect(
+      result.updated_sessions.some(
+        (session) =>
+          session.date === START &&
+          session.day_role === "daily_skill_practice" &&
+          session.status === "scheduled",
+      ),
+    ).toBe(true);
 
     for (const date of Array.from(
       new Set(result.updated_sessions.map((session) => session.date)),
