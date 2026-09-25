@@ -191,7 +191,11 @@ function reconcileDailySkillSlots(
   for (const date of dates) {
     const base = baseForDate(working, date);
 
-    if (base && isMainWorkoutRole(base.day_role)) {
+    if (
+      base &&
+      isMainWorkoutRole(base.day_role) &&
+      base.day_role !== "gym_workout"
+    ) {
       const skill = scheduledSkillForDate(working, date);
       if (skill) {
         working = working.filter((session) => session.id !== skill.id);
