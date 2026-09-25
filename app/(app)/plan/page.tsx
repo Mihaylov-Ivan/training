@@ -535,7 +535,11 @@ export default function PlanPage() {
                     !done &&
                     selected >= today &&
                     s.day_role !== "daily_skill_practice" &&
-                    s.day_role !== "recovery" ? (
+                    s.day_role !== "recovery" &&
+                    !(
+                      s.day_role === "gym_workout" &&
+                      s.missed_note?.startsWith("Automatic substitute:")
+                    ) ? (
                       <SecondaryButton
                         className="flex-1"
                         disabled={smartAdjustingId === s.id}
