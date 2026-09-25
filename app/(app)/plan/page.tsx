@@ -104,6 +104,9 @@ export default function PlanPage() {
   const scheduled = useAppStore((s) => s.scheduledSessions);
   const scanPendingMissedSessions = useAppStore((s) => s.scanPendingMissedSessions);
   const beginManualMiss = useAppStore((s) => s.beginManualMiss);
+  const smartAdjustScheduledSession = useAppStore(
+    (s) => s.smartAdjustScheduledSession,
+  );
   const ensureSchedule = useAppStore((s) => s.ensureSchedule);
   const cycle = cycles[0];
   const today = todayISO();
@@ -114,6 +117,8 @@ export default function PlanPage() {
     month: todayDate.getMonth(),
   });
   const [selected, setSelected] = useState(today);
+  const [smartNotice, setSmartNotice] = useState<string | null>(null);
+  const [smartAdjustingId, setSmartAdjustingId] = useState<string | null>(null);
 
   useEffect(() => {
     ensureSchedule();
@@ -418,6 +423,12 @@ export default function PlanPage() {
           ) : null}
         </div>
 
+        {smartNotice ? (
+          <Card className="mb-3 border-accent/30 bg-accent-soft/20">
+            <p className="text-sm font-medium">{smartNotice}</p>
+          </Card>
+        ) : null}
+
         {selectedSessions.length === 0 ? (
           <Card>
             <p className="font-medium">No structured session</p>
@@ -510,6 +521,34 @@ export default function PlanPage() {
                       >
                         Open in Today
                       </Link>
+                    ) : null}
+                    {!missed &&
+                    !done &&
+                    selected >= today &&
+                    s.day_role !== "daily_skill_practice" &&
+                    s.day_role !== "recovery" ? (
+                      <SecondaryButton
+                        className="flex-1"
+                        disabled={smartAdjustingId === s.id}
+                        onClick={() => {
+                          setSmartAdjustingId(s.id);
+                          setSmartNotice(null);
+                          try {
+                            const result = smartAdjustScheduledSession(s.id);
+                            setSmartNotice(result.explanation);
+                          } finally {
+                            setSmartAdjustingId(null);
+                          }
+                        }}
+                      >
+                        {smartAdjustingId === s.id
+                          ? "Optimising…"
+                          : s.day_role === "climbing" ||
+                              s.day_role === "swim_performance" ||
+                              s.day_role === "swim_recovery"
+                            ? "Auto substitute"
+                            : "Smart swap"}
+                      </SecondaryButton>
                     ) : null}
                     {canMarkMissed(s.status) && s.day_role !== "recovery" ? (
                       <button
