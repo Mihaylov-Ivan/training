@@ -89,6 +89,7 @@ function isMainWorkoutRoleLocal(role: DayRole): boolean {
     "strength_power",
     "athleticism_endurance",
     "calisthenics_volume",
+    "gym_workout",
     "climbing",
   ].includes(role);
 }
