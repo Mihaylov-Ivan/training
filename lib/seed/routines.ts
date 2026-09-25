@@ -1307,7 +1307,7 @@ const gymReplacementItems: RoutineItemDef[] = [
     progression_rule_code: "FRONT_SPLIT_V1",
     progression_scope: "global_skill",
   }),
-]
+];
 
 resetSeq();
 const dailySkillItems: RoutineItemDef[] = [
