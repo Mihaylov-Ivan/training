@@ -108,6 +108,43 @@ describe("smart schedule adjustment", () => {
     }
   });
 
+  it("persists an auto substitution through schedule regeneration / refresh", () => {
+    const { cycle, sessions } = setup();
+    const swim = sessions.find(
+      (session) =>
+        session.day_role === "swim_performance" &&
+        session.status === "scheduled",
+    )!;
+
+    const result = smartAdjustScheduledSession({
+      scheduledId: swim.id,
+      sessions,
+      cycle,
+      wellbeingCheckins: [highReadiness(swim.date)],
+      today: START,
+    });
+
+    const substituted = result.updated_sessions.find(
+      (session) => session.id === swim.id,
+    )!;
+    expect(substituted.generated_from_schedule).toBe(false);
+    expect(substituted.day_role).toBe("boxing");
+
+    const afterRefresh = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 4,
+      existing: result.updated_sessions,
+    });
+    const persisted = afterRefresh.find(
+      (session) => session.id === swim.id,
+    )!;
+
+    expect(persisted.day_role).toBe("boxing");
+    expect(persisted.routine_template_id).toBe("routine-boxing");
+    expect(persisted.generated_from_schedule).toBe(false);
+  });
+
   it("swimming becomes boxing in a normal week rather than adding a fourth-style strength demand", () => {
     const { cycle, sessions } = setup();
     const swim = sessions.find(
@@ -215,6 +252,42 @@ describe("smart schedule adjustment", () => {
       "routine-gym-replacement",
     );
     expect(respectsMainWorkoutBoundaries(result.updated_sessions)).toBe(true);
+  });
+
+  it("persists a smart date swap through schedule regeneration / refresh", () => {
+    const { cycle, sessions } = setup();
+    const mobility = sessions.find(
+      (session) =>
+        session.date === addDays(START, 1) &&
+        session.day_role === "short_mobility_front" &&
+        session.status === "scheduled",
+    )!;
+
+    const result = smartAdjustScheduledSession({
+      scheduledId: mobility.id,
+      sessions,
+      cycle,
+      wellbeingCheckins: [],
+      today: START,
+    });
+    expect(result.changed).toBe(true);
+
+    const moved = result.updated_sessions.find(
+      (session) => session.id === mobility.id,
+    )!;
+    expect(moved.generated_from_schedule).toBe(false);
+
+    const afterRefresh = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 4,
+      existing: result.updated_sessions,
+    });
+    const persisted = afterRefresh.find(
+      (session) => session.id === mobility.id,
+    )!;
+    expect(persisted.date).toBe(moved.date);
+    expect(persisted.day_role).toBe(moved.day_role);
   });
 
   it("short sessions are swapped automatically while daily skills stay attached to both dates", () => {
