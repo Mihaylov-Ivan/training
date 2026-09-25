@@ -106,6 +106,7 @@ export type DayRole =
   | "swim_performance"
   | "swim_recovery"
   | "boxing"
+  | "gym_workout"
   | "calisthenics_volume"
   | "climbing"
   | "recovery";
