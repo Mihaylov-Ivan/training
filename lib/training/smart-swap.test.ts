@@ -145,7 +145,7 @@ describe("smart schedule adjustment", () => {
     expect(persisted.generated_from_schedule).toBe(false);
   });
 
-  it("a second auto substitute advances Swimming → Boxing → Gym and keeps hard limits", () => {
+  it("a second auto substitute advances Swimming → Boxing → Gym on the same day and keeps hard limits", () => {
     const { cycle, sessions } = setup();
     const swim = sessions.find(
       (session) =>
@@ -184,6 +184,7 @@ describe("smart schedule adjustment", () => {
     expect(gym.day_role).toBe("gym_workout");
     expect(gym.routine_template_id).toBe("routine-gym-replacement");
     expect(gym.generated_from_schedule).toBe(false);
+    expect(gym.date).toBe(swim.date);
     expect(respectsMainWorkoutBoundaries(second.updated_sessions)).toBe(
       true,
     );
