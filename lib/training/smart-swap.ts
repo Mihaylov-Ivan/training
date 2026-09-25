@@ -233,11 +233,228 @@ function reconcileDailySkillSlots(
   return canonicalizeLiveScheduleRows(working);
 }
 
+function isAutomaticSubstitute(
+  session: ScheduledSession,
+): boolean {
+  return session.missed_note?.startsWith("Automatic substitute:") ?? false;
+}
+
+function withSubstitute(
+  session: ScheduledSession,
+  role: DayRole,
+  routineId: string,
+  note: string,
+  date = session.date,
+  sequenceIndex = 0,
+): ScheduledSession {
+  return {
+    ...session,
+    date,
+    day_role: role,
+    routine_template_id: routineId,
+    sequence_index: sequenceIndex,
+    generated_from_schedule: false,
+    auto_rescheduled: false,
+    manually_rescheduled: false,
+    reschedule_count: (session.reschedule_count ?? 0) + 1,
+    missed_note: note,
+  };
+}
+
+function placeRepeatedGymSubstitute(opts: {
+  target: ScheduledSession;
+  sessions: ScheduledSession[];
+  cycle: TrainingCycle;
+  today: string;
+  oldName: string;
+}): SmartScheduleResult {
+  const { target, sessions, cycle, today, oldName } = opts;
+  const oldName =
+    getRoutineById(target.routine_template_id)?.name ??
+    target.day_role.replaceAll("_", " ");
+
+  // Repeated Auto substitute advances to the next alternative instead of
+  // treating the already-substituted session as an ordinary smart swap.
+  if (isAutomaticSubstitute(target) && target.day_role === "boxing") {
+    return placeRepeatedGymSubstitute({
+      target,
+      sessions,
+      cycle,
+      today,
+      oldName,
+    });
+  }
+
+  if (isAutomaticSubstitute(target) && target.day_role === "gym_workout") {
+    const boxingName =
+      getRoutineById("routine-boxing")?.name ?? "Boxing";
+    let updated = sessions.map((session) =>
+      session.id === target.id
+        ? withSubstitute(
+            session,
+            "boxing",
+            "routine-boxing",
+            `Automatic substitute: ${oldName} → ${boxingName}`,
+            target.date,
+            0,
+          )
+        : session,
+    );
+    updated = reconcileDailySkillSlots(
+      updated,
+      [target.date],
+      target.user_id,
+      cycle,
+    );
+    return {
+      changed: true,
+      updated_sessions: updated,
+      explanation: `${oldName} was replaced with ${boxingName}.`,
+      action: "substitute",
+    };
+  }
+
+  const weekStart = calendarWeekStart(target.date);
+  const weekEnd = addDays(weekStart, 6);
+  const gymName =
+    getRoutineById("routine-gym-replacement")?.name ??
+    "Gym replacement";
+
+  const dates = Array.from({ length: 7 }, (_, index) =>
+    addDays(weekStart, index),
+  )
+    .filter((date) => date >= today && date <= weekEnd)
+    .sort(
+      (a, b) =>
+        Math.abs(daysBetween(target.date, a)) -
+          Math.abs(daysBetween(target.date, b)) ||
+        a.localeCompare(b),
+    );
+
+  // First try to add the gym replacement without removing another main.
+  for (const date of dates) {
+    const hasOtherMain = sessions.some(
+      (session) =>
+        session.id !== target.id &&
+        session.date === date &&
+        isMainWorkoutRole(session.day_role) &&
+        MAIN_LOAD.has(session.status),
+    );
+    if (hasOtherMain) continue;
+
+    const note =
+      date === target.date
+        ? `Automatic substitute: ${oldName} → ${gymName}`
+        : `Automatic substitute: ${oldName} → ${gymName} · moved to ${date} to protect recovery`;
+
+    let proposed = sessions.map((session) =>
+      session.id === target.id
+        ? withSubstitute(
+            session,
+            "gym_workout",
+            "routine-gym-replacement",
+            note,
+            date,
+            0,
+          )
+        : session,
+    );
+    proposed = canonicalizeLiveScheduleRows(proposed);
+
+    if (!isValidMainLayout(proposed)) continue;
+
+    proposed = reconcileDailySkillSlots(
+      proposed,
+      [target.date, date],
+      target.user_id,
+      cycle,
+    );
+
+    return {
+      changed: true,
+      updated_sessions: proposed,
+      explanation:
+        date === target.date
+          ? `${oldName} was replaced with ${gymName}.`
+          : `${oldName} was replaced with ${gymName}. The gym session was moved to ${date}, the nearest safe slot that preserves your main-workout recovery limits.`,
+      action: "substitute",
+    };
+  }
+
+  // If there is no legal extra main slot, use the gym session instead of the
+  // nearest not-yet-done main workout. This still gives the requested gym
+  // substitute without creating a fifth/adjacent hard session.
+  const replaceableMains = sessions
+    .filter(
+      (session) =>
+        session.id !== target.id &&
+        session.date >= today &&
+        session.date >= weekStart &&
+        session.date <= weekEnd &&
+        isMainWorkoutRole(session.day_role) &&
+        ADJUSTABLE.has(session.status),
+    )
+    .sort(
+      (a, b) =>
+        Math.abs(daysBetween(target.date, a.date)) -
+          Math.abs(daysBetween(target.date, b.date)) ||
+        a.date.localeCompare(b.date),
+    );
+
+  for (const main of replaceableMains) {
+    const mainName =
+      getRoutineById(main.routine_template_id)?.name ??
+      main.day_role.replaceAll("_", " ");
+    const note = `Automatic substitute: ${oldName} → ${gymName} · replaces ${mainName} on ${main.date} to preserve recovery limits`;
+
+    let proposed = sessions
+      .filter((session) => session.id !== main.id)
+      .map((session) =>
+        session.id === target.id
+          ? withSubstitute(
+              session,
+              "gym_workout",
+              "routine-gym-replacement",
+              note,
+              main.date,
+              main.sequence_index,
+            )
+          : session,
+      );
+    proposed = canonicalizeLiveScheduleRows(proposed);
+
+    if (!isValidMainLayout(proposed)) continue;
+
+    proposed = reconcileDailySkillSlots(
+      proposed,
+      [target.date, main.date],
+      target.user_id,
+      cycle,
+    );
+
+    return {
+      changed: true,
+      updated_sessions: proposed,
+      explanation: `${oldName} was replaced with ${gymName}. There was no safe extra main-workout slot, so the gym session replaces ${mainName} on ${main.date}; this preserves your one-main-per-day and recovery rules.`,
+      action: "substitute",
+    };
+  }
+
+  return {
+    changed: false,
+    updated_sessions: sessions,
+    explanation:
+      "No safe gym substitution can be placed this week without breaking your hard recovery or main-workout limits.",
+    action: "none",
+  };
+}
+
 function substitute(
   target: ScheduledSession,
   sessions: ScheduledSession[],
   cycle: TrainingCycle,
   checkins: WellbeingCheckin[],
+  today: string,
 ): SmartScheduleResult {
   const checkin = latestRelevantCheckin(checkins, target.date);
   const readiness = readinessPercent(checkin);
@@ -301,9 +518,6 @@ function substitute(
     }
   }
 
-  const oldName =
-    getRoutineById(target.routine_template_id)?.name ??
-    target.day_role.replaceAll("_", " ");
   const newName =
     getRoutineById(replacementRoutineId)?.name ??
     replacementRole.replaceAll("_", " ");
@@ -653,12 +867,16 @@ export function smartAdjustScheduledSession(opts: {
     };
   }
 
-  if (SPECIAL_ROLES.has(target.day_role)) {
+  if (
+    SPECIAL_ROLES.has(target.day_role) ||
+    isAutomaticSubstitute(target)
+  ) {
     return substitute(
       target,
       opts.sessions,
       opts.cycle,
       opts.wellbeingCheckins,
+      opts.today,
     );
   }
 
