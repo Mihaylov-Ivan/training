@@ -138,6 +138,7 @@ function updateDate(
     cycle_week: cycleWeek,
     is_deload: cycleWeek === 4,
     reschedule_count: (session.reschedule_count ?? 0) + 1,
+    generated_from_schedule: false,
     auto_rescheduled: true,
     manually_rescheduled: false,
     missed_note: note,
@@ -319,6 +320,7 @@ function substitute(
                 ? target.sequence_index
                 : 0
               : 0,
+          generated_from_schedule: false,
           auto_rescheduled: false,
           manually_rescheduled: false,
           reschedule_count: (session.reschedule_count ?? 0) + 1,
@@ -342,6 +344,7 @@ function substitute(
             day_role: "boxing" as DayRole,
             routine_template_id: replacementRoutineId,
             sequence_index: 0,
+            generated_from_schedule: false,
             auto_rescheduled: false,
             manually_rescheduled: false,
             reschedule_count: (session.reschedule_count ?? 0) + 1,
@@ -470,6 +473,7 @@ function rebalanceMain(
         completed_at: null,
         missed_reason: null,
         rescheduled_from_id: null,
+        generated_from_schedule: false,
         manually_rescheduled: false,
         auto_rescheduled: true,
         missed_note: `Automatic weekly rebalance from ${source.date}`,
