@@ -272,6 +272,23 @@ function placeRepeatedGymSubstitute(opts: {
     getRoutineById("routine-gym-replacement")?.name ??
     "Gym replacement";
 
+  const otherMainSameDay = sessions.some(
+    (session) =>
+      session.id !== target.id &&
+      session.date === target.date &&
+      isMainWorkoutRole(session.day_role) &&
+      MAIN_LOAD.has(session.status),
+  );
+  if (otherMainSameDay) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "Gym cannot replace Boxing on this same day because another main workout is already scheduled there. Boxing was kept so no workout disappears.",
+      action: "none",
+    };
+  }
+
   // Repeated Auto substitute is an explicit same-day replacement. Do not
   // silently move it elsewhere: Swimming → Boxing → Gym remains on the
   // original selected calendar day.
