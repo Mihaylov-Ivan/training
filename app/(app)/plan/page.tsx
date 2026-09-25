@@ -84,6 +84,7 @@ function statusLabel(s: ScheduledSession): string {
   if (s.status === "skipped") return "Skipped";
   if (s.status === "pending_missed_confirmation" || s.status === "overdue")
     return "Needs confirm";
+  if (s.status === "in_progress") return "In progress";
   if (s.missed_note?.startsWith("Automatic substitute:")) {
     return "↻ Substituted";
   }
@@ -105,6 +106,10 @@ export default function PlanPage() {
   const router = useRouter();
   const cycles = useAppStore((s) => s.cycles);
   const scheduled = useAppStore((s) => s.scheduledSessions);
+  const trainingSessions = useAppStore((s) => s.trainingSessions);
+  const startSessionFromScheduled = useAppStore(
+    (s) => s.startSessionFromScheduled,
+  );
   const scanPendingMissedSessions = useAppStore((s) => s.scanPendingMissedSessions);
   const beginManualMiss = useAppStore((s) => s.beginManualMiss);
   const smartAdjustScheduledSession = useAppStore(
@@ -454,6 +459,19 @@ export default function PlanPage() {
               const missed = s.status === "missed" || s.status === "skipped";
               const done =
                 s.status === "completed" || s.status === "partially_completed";
+              const linkedTraining = [...trainingSessions]
+                .filter(
+                  (training) =>
+                    training.scheduled_session_id === s.id &&
+                    training.status !== "abandoned",
+                )
+                .sort((a, b) =>
+                  (b.started_at ?? "").localeCompare(a.started_at ?? ""),
+                )[0];
+              const openTraining =
+                linkedTraining && !linkedTraining.ended_at
+                  ? linkedTraining
+                  : null;
               return (
                 <Card
                   key={s.id}
@@ -531,8 +549,33 @@ export default function PlanPage() {
                         Open in Today
                       </Link>
                     ) : null}
+                    {selected > today &&
+                    !missed &&
+                    !done &&
+                    s.day_role !== "recovery" ? (
+                      <PrimaryButton
+                        className="flex-1"
+                        onClick={() => {
+                          const sessionId = startSessionFromScheduled(s.id);
+                          router.push(`/session/${sessionId}`);
+                        }}
+                      >
+                        {openTraining || s.status === "in_progress"
+                          ? "Continue workout"
+                          : "Start workout"}
+                      </PrimaryButton>
+                    ) : null}
+                    {done && linkedTraining ? (
+                      <Link
+                        href={`/session/${linkedTraining.id}/summary`}
+                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-border px-4 text-sm font-semibold"
+                      >
+                        View summary
+                      </Link>
+                    ) : null}
                     {!missed &&
                     !done &&
+                    s.status !== "in_progress" &&
                     selected >= today &&
                     s.day_role !== "daily_skill_practice" &&
                     s.day_role !== "recovery" &&
