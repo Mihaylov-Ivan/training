@@ -269,51 +269,6 @@ function placeRepeatedGymSubstitute(opts: {
   oldName: string;
 }): SmartScheduleResult {
   const { target, sessions, cycle, today, oldName } = opts;
-  const oldName =
-    getRoutineById(target.routine_template_id)?.name ??
-    target.day_role.replaceAll("_", " ");
-
-  // Repeated Auto substitute advances to the next alternative instead of
-  // treating the already-substituted session as an ordinary smart swap.
-  if (isAutomaticSubstitute(target) && target.day_role === "boxing") {
-    return placeRepeatedGymSubstitute({
-      target,
-      sessions,
-      cycle,
-      today,
-      oldName,
-    });
-  }
-
-  if (isAutomaticSubstitute(target) && target.day_role === "gym_workout") {
-    const boxingName =
-      getRoutineById("routine-boxing")?.name ?? "Boxing";
-    let updated = sessions.map((session) =>
-      session.id === target.id
-        ? withSubstitute(
-            session,
-            "boxing",
-            "routine-boxing",
-            `Automatic substitute: ${oldName} → ${boxingName}`,
-            target.date,
-            0,
-          )
-        : session,
-    );
-    updated = reconcileDailySkillSlots(
-      updated,
-      [target.date],
-      target.user_id,
-      cycle,
-    );
-    return {
-      changed: true,
-      updated_sessions: updated,
-      explanation: `${oldName} was replaced with ${boxingName}.`,
-      action: "substitute",
-    };
-  }
-
   const weekStart = calendarWeekStart(target.date);
   const weekEnd = addDays(weekStart, 6);
   const gymName =
@@ -456,6 +411,50 @@ function substitute(
   checkins: WellbeingCheckin[],
   today: string,
 ): SmartScheduleResult {
+  const oldName =
+    getRoutineById(target.routine_template_id)?.name ??
+    target.day_role.replaceAll("_", " ");
+
+  // Repeated Auto substitute advances to the next viable alternative.
+  if (isAutomaticSubstitute(target) && target.day_role === "boxing") {
+    return placeRepeatedGymSubstitute({
+      target,
+      sessions,
+      cycle,
+      today,
+      oldName,
+    });
+  }
+
+  if (isAutomaticSubstitute(target) && target.day_role === "gym_workout") {
+    const boxingName =
+      getRoutineById("routine-boxing")?.name ?? "Boxing";
+    let updated = sessions.map((session) =>
+      session.id === target.id
+        ? withSubstitute(
+            session,
+            "boxing",
+            "routine-boxing",
+            `Automatic substitute: ${oldName} → ${boxingName}`,
+            target.date,
+            0,
+          )
+        : session,
+    );
+    updated = reconcileDailySkillSlots(
+      updated,
+      [target.date],
+      target.user_id,
+      cycle,
+    );
+    return {
+      changed: true,
+      updated_sessions: updated,
+      explanation: `${oldName} was replaced with ${boxingName}.`,
+      action: "substitute",
+    };
+  }
+
   const checkin = latestRelevantCheckin(checkins, target.date);
   const readiness = readinessPercent(checkin);
   const lowReadiness =
