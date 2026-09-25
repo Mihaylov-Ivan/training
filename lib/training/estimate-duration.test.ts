@@ -210,6 +210,24 @@ describe("estimateRoutineDurationMin", () => {
     }
   });
 
+  it("gym replacement is exercise-only, ends with stretching, and is about 45 minutes", () => {
+    const gym = getRoutineById("routine-gym-replacement")!;
+    const slugs = gym.items.map((item) => item.exercise_slug);
+    const blocks = gym.items.map((item) => item.block);
+
+    expect(slugs).not.toContain("oahs-practice");
+    expect(slugs).not.toContain("planche-hold");
+    expect(slugs).not.toContain("one-leg-human-flag");
+    expect(slugs).not.toContain("front-lever-hold");
+    expect(slugs).not.toContain("back-lever-hold");
+    expect(blocks).not.toContain("warmup");
+    expect(slugs.slice(-2)).toEqual(["couch-stretch", "front-split"]);
+
+    const duration = estimateRoutineDurationMin(gym);
+    expect(duration).toBeGreaterThanOrEqual(43);
+    expect(duration).toBeLessThanOrEqual(47);
+  });
+
   it("the separate daily skill routine emphasizes OAHS and keeps planche light", () => {
     const routine = getRoutineById("routine-sunday-skills")!;
     const oahs = routine.items.find(
