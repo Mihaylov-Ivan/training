@@ -462,7 +462,9 @@ export default function PlanPage() {
                       ? "border-danger/40 bg-danger-soft/20"
                       : done
                         ? "border-success/40 bg-success-soft/20"
-                        : s.auto_rescheduled || s.rescheduled_from_id
+                        : s.auto_rescheduled ||
+                            s.rescheduled_from_id ||
+                            s.missed_note?.startsWith("Automatic substitute:")
                           ? "border-accent/40 bg-accent-soft/20"
                           : ""
                   }`}
@@ -500,7 +502,9 @@ export default function PlanPage() {
                         tone={
                           missed
                             ? "danger"
-                            : s.rescheduled_from_id || s.auto_rescheduled
+                            : s.rescheduled_from_id ||
+                                s.auto_rescheduled ||
+                                s.missed_note?.startsWith("Automatic substitute:")
                               ? "accent"
                               : statusTone(s.status)
                         }
