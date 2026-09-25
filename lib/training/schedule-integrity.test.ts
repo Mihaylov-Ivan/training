@@ -165,6 +165,48 @@ describe("schedule live-row integrity", () => {
     ).toHaveLength(1);
   });
 
+  it("allows a separate daily skill card beside a gym replacement main session", () => {
+    const cycle = createActiveCycle("user-1", "2026-09-21");
+    const rows = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 1,
+    });
+    const tuesdayBase = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "short_mobility_front",
+    )!;
+    const skill = rows.find(
+      (row) =>
+        row.date === "2026-09-22" &&
+        row.day_role === "daily_skill_practice",
+    )!;
+    const gym = normalizeScheduledSession({
+      ...tuesdayBase,
+      id: "gym-replacement-tuesday",
+      day_role: "gym_workout",
+      routine_template_id: "routine-gym-replacement",
+      generated_from_schedule: false,
+    });
+
+    const clean = canonicalizeLiveScheduleRows([gym, skill]);
+
+    expect(
+      clean.filter(
+        (row) =>
+          row.date === "2026-09-22" &&
+          row.status === "scheduled",
+      ),
+    ).toHaveLength(2);
+    expect(
+      clean.some(
+        (row) => row.day_role === "daily_skill_practice",
+      ),
+    ).toBe(true);
+    expect(clean.some((row) => row.day_role === "gym_workout")).toBe(true);
+  });
+
   it("allows terminal history alongside the two intentional live cards", () => {
     const cycle = createActiveCycle("user-1", "2026-09-21");
     const rows = generateScheduledSessions({
