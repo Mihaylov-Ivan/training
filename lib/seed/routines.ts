@@ -1202,51 +1202,6 @@ const boxingItems: RoutineItemDef[] = [
 resetSeq();
 const gymReplacementItems: RoutineItemDef[] = [
   item({
-    exercise_slug: "wrist-rocks",
-    block: "warmup",
-    prescription: {
-      sets: 1,
-      reps_per_set: 10,
-      rest_seconds: 0,
-      extras: { forward: 10, lateral: 10 },
-    },
-    rest_seconds: 0,
-  }),
-  item({
-    exercise_slug: "scapular-push-up",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
-    exercise_slug: "scapular-pull-up",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 8, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  oahsItem(4),
-  plancheItem(5, "medium"),
-  flagItem(6, { holdSeconds: 6, sets: 2, notes: "Light/quality flag work" }),
-  leverItem(7, "front-lever-hold", "light"),
-  leverItem(8, "back-lever-hold", "light"),
-  item({
-    exercise_slug: "air-squat",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 15, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
-    exercise_slug: "reverse-lunge",
-    block: "warmup",
-    prescription: {
-      sets: 1,
-      reps_per_set: 8,
-      per_side: true,
-      rest_seconds: 0,
-    },
-    rest_seconds: 0,
-  }),
-  item({
     exercise_slug: "weighted-pull-up",
     block: "strength",
     prescription: {
@@ -1272,6 +1227,19 @@ const gymReplacementItems: RoutineItemDef[] = [
     rest_seconds: 150,
     level_from_state: true,
     progression_rule_code: "HSPU_LEVEL_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "parallel-bar-dip",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 10,
+      load_kg: 0,
+      rest_seconds: 75,
+    },
+    rest_seconds: 75,
+    load_from_state: true,
     progression_scope: "routine_item",
   }),
   item({
@@ -1316,7 +1284,7 @@ const gymReplacementItems: RoutineItemDef[] = [
     progression_scope: "routine_item",
   }),
   item({
-    exercise_slug: "front-split",
+    exercise_slug: "couch-stretch",
     block: "flexibility",
     prescription: {
       sets: 1,
@@ -1325,10 +1293,21 @@ const gymReplacementItems: RoutineItemDef[] = [
       rest_seconds: 15,
     },
     rest_seconds: 15,
+  }),
+  item({
+    exercise_slug: "front-split",
+    block: "flexibility",
+    prescription: {
+      sets: 1,
+      hold_seconds: 60,
+      per_side: true,
+      rest_seconds: 15,
+    },
+    rest_seconds: 15,
     progression_rule_code: "FRONT_SPLIT_V1",
     progression_scope: "global_skill",
   }),
-];
+]
 
 resetSeq();
 const dailySkillItems: RoutineItemDef[] = [
@@ -1587,10 +1566,10 @@ export const ROUTINES: RoutineTemplateDef[] = [
   }),
   withEstimatedDuration({
     id: "routine-gym-replacement",
-    name: "Gym replacement — Full body",
+    name: "Gym replacement — 45 min",
     kind: "primary",
     description:
-      "Automatic venue-safe replacement · wrist prep → OAHS → planche → flag → front/back levers → lower-body warmup → balanced full-body strength",
+      "Exercises only · no warm-up or skill block · full-body strength + core + final stretching",
     day_roles: ["gym_workout"],
     items: gymReplacementItems,
   }),
