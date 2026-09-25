@@ -1226,6 +1226,26 @@ const gymReplacementItems: RoutineItemDef[] = [
   }),
   oahsItem(4),
   plancheItem(5, "medium"),
+  flagItem(6, { holdSeconds: 6, sets: 2, notes: "Light/quality flag work" }),
+  leverItem(7, "front-lever-hold", "light"),
+  leverItem(8, "back-lever-hold", "light"),
+  item({
+    exercise_slug: "air-squat",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 15, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "reverse-lunge",
+    block: "warmup",
+    prescription: {
+      sets: 1,
+      reps_per_set: 8,
+      per_side: true,
+      rest_seconds: 0,
+    },
+    rest_seconds: 0,
+  }),
   item({
     exercise_slug: "weighted-pull-up",
     block: "strength",
@@ -1570,7 +1590,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Gym replacement — Full body",
     kind: "primary",
     description:
-      "Automatic venue-safe replacement · OAHS + planche + balanced full-body strength",
+      "Automatic venue-safe replacement · wrist prep → OAHS → planche → flag → front/back levers → lower-body warmup → balanced full-body strength",
     day_roles: ["gym_workout"],
     items: gymReplacementItems,
   }),
