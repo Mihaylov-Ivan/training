@@ -342,7 +342,7 @@ function substitute(
             day_role: "boxing" as DayRole,
             routine_template_id: replacementRoutineId,
             sequence_index: 0,
-            auto_rescheduled: true,
+            auto_rescheduled: false,
             manually_rescheduled: false,
             reschedule_count: (session.reschedule_count ?? 0) + 1,
             missed_note: `Automatic substitute: ${oldName} → ${fallbackName}`,
