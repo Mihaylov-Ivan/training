@@ -189,9 +189,8 @@ function reconcileDailySkillSlots(
 
   for (const date of dates) {
     const base = baseForDate(working, date);
-    if (!base) continue;
 
-    if (isMainWorkoutRole(base.day_role)) {
+    if (base && isMainWorkoutRole(base.day_role)) {
       const skill = scheduledSkillForDate(working, date);
       if (skill) {
         working = working.filter((session) => session.id !== skill.id);
@@ -199,7 +198,9 @@ function reconcileDailySkillSlots(
       continue;
     }
 
-    if (base.day_role === "recovery") continue;
+    // If a main workout moved away, the date may now be fully open. OAHS +
+    // planche still belongs on that day, so an open day also gets the light
+    // daily skill card.
     if (anySkillRecordForDate(working, date)) continue;
 
     const cycleWeek = cycleWeekForDate(cycle.start_date, date);
