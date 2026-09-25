@@ -21,6 +21,7 @@ const MAIN_ROLES: DayRole[] = [
   "strength_power",
   "athleticism_endurance",
   "calisthenics_volume",
+  "gym_workout",
   "climbing",
 ];
 
