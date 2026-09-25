@@ -126,6 +126,45 @@ describe("schedule live-row integrity", () => {
     ).toBe("completed");
   });
 
+  it("preserves an early-started future session as in progress during schedule regeneration", () => {
+    const cycle = createActiveCycle("user-1", "2026-09-21");
+    const rows = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 2,
+    });
+    const future = rows.find(
+      (row) =>
+        row.date === "2026-09-23" &&
+        row.day_role === "athleticism_endurance",
+    )!;
+    const started = normalizeScheduledSession({
+      ...future,
+      status: "in_progress",
+    });
+    const existing = rows.map((row) =>
+      row.id === future.id ? started : row,
+    );
+
+    const regenerated = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 2,
+      existing,
+    });
+
+    expect(
+      regenerated.find((row) => row.id === future.id)?.status,
+    ).toBe("in_progress");
+    expect(
+      regenerated.filter(
+        (row) =>
+          row.date === future.date &&
+          row.day_role === "athleticism_endurance",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("allows terminal history alongside the two intentional live cards", () => {
     const cycle = createActiveCycle("user-1", "2026-09-21");
     const rows = generateScheduledSessions({
