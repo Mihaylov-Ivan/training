@@ -224,10 +224,22 @@ export function generateScheduledSessions(opts: {
     });
   });
 
-  // Any existing row occupies its schedule slot, including completed,
-  // missed or skipped rows. This prevents ensureSchedule() from recreating a
-  // card after the athlete has already completed or intentionally skipped it.
+  // Any existing row occupies its current schedule slot, including completed,
+  // missed or skipped rows. Explicit overrides that moved to another date also
+  // reserve their original base-plan slot. Without this second reservation,
+  // ensureSchedule() would recreate the old Swimming/Climbing/main card after
+  // a smart substitute or rebalance moved the override elsewhere.
   const existingKeys = new Set(existing.map(scheduleKey));
+  for (const session of existing) {
+    if (
+      !session.generated_from_schedule &&
+      session.original_date &&
+      session.original_date !== session.date &&
+      session.day_role !== "daily_skill_practice"
+    ) {
+      existingKeys.add(`${session.original_date}:day`);
+    }
+  }
   const out: ScheduledSession[] = [...existing];
   const start = opts.cycle.start_date;
   let sequence = Math.max(0, ...existing.map((row) => row.sequence_index), 0);
