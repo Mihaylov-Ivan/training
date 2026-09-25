@@ -11,6 +11,7 @@ import {
 } from "@/lib/training/schedule";
 import {
   isMainWorkoutRole,
+  recalculateSchedule,
   respectsMainWorkoutBoundaries,
 } from "@/lib/training/adaptive-schedule";
 import {
@@ -397,6 +398,105 @@ function candidatePenalty(
   return score;
 }
 
+function rebalanceMain(
+  target: ScheduledSession,
+  sessions: ScheduledSession[],
+  cycle: TrainingCycle,
+): SmartScheduleResult {
+  const proposal = recalculateSchedule({
+    missedSession: target,
+    upcomingSessions: sessions,
+    cycle,
+    reason: "no_time",
+  });
+
+  if (
+    proposal.recommendation !== "apply" ||
+    proposal.moved_sessions.length === 0
+  ) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "No safe same-week rebalance improves this main workout without breaking recovery or the weekly load limits.",
+      action: "none",
+    };
+  }
+
+  const sourceById = new Map(sessions.map((session) => [session.id, session]));
+  const makeupRows = proposal.updated_sessions.filter(
+    (session) => session.rescheduled_from_id,
+  );
+  const movedSourceIds = new Set(
+    makeupRows
+      .map((session) => session.rescheduled_from_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const autoSkippedIds = new Set(
+    proposal.skipped_sessions
+      .filter((session) => !isMainWorkoutRole(session.day_role))
+      .map((session) => session.id),
+  );
+
+  let updated = proposal.updated_sessions
+    .filter(
+      (session) =>
+        !movedSourceIds.has(session.id) &&
+        !autoSkippedIds.has(session.id),
+    )
+    .map((session) => {
+      if (!session.rescheduled_from_id) return session;
+      const source = sourceById.get(session.rescheduled_from_id);
+      if (!source) return session;
+
+      return {
+        ...session,
+        original_date: source.original_date,
+        status: "scheduled" as const,
+        completed_at: null,
+        missed_reason: null,
+        rescheduled_from_id: null,
+        manually_rescheduled: false,
+        auto_rescheduled: true,
+        missed_note: `Automatic weekly rebalance from ${source.date}`,
+      };
+    });
+
+  const affectedDates = new Set<string>([target.date]);
+  for (const move of proposal.moved_sessions) {
+    affectedDates.add(move.from_date);
+    affectedDates.add(move.to_date);
+  }
+
+  updated = reconcileDailySkillSlots(
+    updated,
+    [...affectedDates],
+    target.user_id,
+    cycle,
+  );
+
+  if (!isValidMainLayout(updated)) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "The proposed rebalance was rejected because it would break a main-workout recovery or load boundary.",
+      action: "none",
+    };
+  }
+
+  const movedNames = proposal.moved_sessions
+    .map((move) => `${move.label}: ${move.from_date} → ${move.to_date}`)
+    .join("; ");
+
+  return {
+    changed: true,
+    updated_sessions: updated,
+    explanation: `The week was automatically rebalanced: ${movedNames}. No workout was counted as missed; lower-priority support work was removed only where necessary to protect recovery.`,
+    action: "swap",
+  };
+}
+
 function swapOrdinary(
   target: ScheduledSession,
   sessions: ScheduledSession[],
@@ -542,6 +642,10 @@ export function smartAdjustScheduledSession(opts: {
       opts.cycle,
       opts.wellbeingCheckins,
     );
+  }
+
+  if (isMainWorkoutRole(target.day_role)) {
+    return rebalanceMain(target, opts.sessions, opts.cycle);
   }
 
   return swapOrdinary(
