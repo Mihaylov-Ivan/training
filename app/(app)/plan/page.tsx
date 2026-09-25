@@ -607,7 +607,9 @@ export default function PlanPage() {
                             : "Smart swap"}
                       </SecondaryButton>
                     ) : null}
-                    {canMarkMissed(s.status) && s.day_role !== "recovery" ? (
+                    {canMarkMissed(s.status) &&
+                    s.status !== "in_progress" &&
+                    s.day_role !== "recovery" ? (
                       <button
                         type="button"
                         className="min-h-11 rounded-2xl px-3 text-sm font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
