@@ -554,7 +554,8 @@ export default function PlanPage() {
                           ? "Optimising…"
                           : s.day_role === "climbing" ||
                               s.day_role === "swim_performance" ||
-                              s.day_role === "swim_recovery"
+                              s.day_role === "swim_recovery" ||
+                              s.missed_note?.startsWith("Automatic substitute:")
                             ? "Auto substitute"
                             : "Smart swap"}
                       </SecondaryButton>
