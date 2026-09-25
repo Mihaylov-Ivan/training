@@ -84,6 +84,9 @@ function statusLabel(s: ScheduledSession): string {
   if (s.status === "skipped") return "Skipped";
   if (s.status === "pending_missed_confirmation" || s.status === "overdue")
     return "Needs confirm";
+  if (s.missed_note?.startsWith("Automatic substitute:")) {
+    return "↻ Substituted";
+  }
   if (s.auto_rescheduled || s.rescheduled_from_id) return "↪ Moved here";
   if (s.is_deload) return "Deload";
   return "Scheduled";
@@ -485,9 +488,11 @@ export default function PlanPage() {
                           ? s.missed_reason
                             ? `Missed · ${s.missed_reason.replaceAll("_", " ")}`
                             : "Marked missed — kept in history"
-                          : s.rescheduled_from_id || s.auto_rescheduled
-                            ? `Originally ${s.original_date}`
-                            : routine?.description}
+                          : s.missed_note?.startsWith("Automatic substitute:")
+                            ? s.missed_note
+                            : s.rescheduled_from_id || s.auto_rescheduled
+                              ? `Originally ${s.original_date}`
+                              : routine?.description}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
