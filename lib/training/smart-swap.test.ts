@@ -145,6 +145,108 @@ describe("smart schedule adjustment", () => {
     expect(persisted.generated_from_schedule).toBe(false);
   });
 
+  it("a second auto substitute advances Swimming → Boxing → Gym and keeps hard limits", () => {
+    const { cycle, sessions } = setup();
+    const swim = sessions.find(
+      (session) =>
+        session.day_role === "swim_performance" &&
+        session.status === "scheduled",
+    )!;
+
+    const first = smartAdjustScheduledSession({
+      scheduledId: swim.id,
+      sessions,
+      cycle,
+      wellbeingCheckins: [highReadiness(swim.date)],
+      today: START,
+    });
+    const boxing = first.updated_sessions.find(
+      (session) => session.id === swim.id,
+    )!;
+    expect(boxing.day_role).toBe("boxing");
+    expect(boxing.missed_note?.startsWith("Automatic substitute:")).toBe(
+      true,
+    );
+
+    const second = smartAdjustScheduledSession({
+      scheduledId: swim.id,
+      sessions: first.updated_sessions,
+      cycle,
+      wellbeingCheckins: [highReadiness(swim.date)],
+      today: START,
+    });
+    const gym = second.updated_sessions.find(
+      (session) => session.id === swim.id,
+    )!;
+
+    expect(second.changed).toBe(true);
+    expect(second.action).toBe("substitute");
+    expect(gym.day_role).toBe("gym_workout");
+    expect(gym.routine_template_id).toBe("routine-gym-replacement");
+    expect(gym.generated_from_schedule).toBe(false);
+    expect(respectsMainWorkoutBoundaries(second.updated_sessions)).toBe(
+      true,
+    );
+
+    for (const date of Array.from(
+      new Set(second.updated_sessions.map((session) => session.date)),
+    )) {
+      expect(
+        activeMainCountOnDate(second.updated_sessions, date),
+      ).toBeLessThanOrEqual(1);
+    }
+
+    const afterRefresh = generateScheduledSessions({
+      userId: "user-1",
+      cycle,
+      weeksAhead: 4,
+      existing: second.updated_sessions,
+    });
+    const persisted = afterRefresh.find(
+      (session) => session.id === swim.id,
+    )!;
+    expect(persisted.day_role).toBe("gym_workout");
+    expect(persisted.routine_template_id).toBe(
+      "routine-gym-replacement",
+    );
+  });
+
+  it("a second auto substitute can change a climbing-derived Gym session to Boxing", () => {
+    const { cycle, sessions } = setup();
+    const climbing = sessions.find(
+      (session) =>
+        session.day_role === "climbing" &&
+        session.status === "scheduled",
+    )!;
+
+    const first = smartAdjustScheduledSession({
+      scheduledId: climbing.id,
+      sessions,
+      cycle,
+      wellbeingCheckins: [highReadiness(climbing.date)],
+      today: START,
+    });
+    expect(
+      first.updated_sessions.find(
+        (session) => session.id === climbing.id,
+      )?.day_role,
+    ).toBe("gym_workout");
+
+    const second = smartAdjustScheduledSession({
+      scheduledId: climbing.id,
+      sessions: first.updated_sessions,
+      cycle,
+      wellbeingCheckins: [highReadiness(climbing.date)],
+      today: START,
+    });
+    const replacement = second.updated_sessions.find(
+      (session) => session.id === climbing.id,
+    )!;
+    expect(replacement.day_role).toBe("boxing");
+    expect(replacement.routine_template_id).toBe("routine-boxing");
+    expect(replacement.generated_from_schedule).toBe(false);
+  });
+
   it("swimming becomes boxing in a normal week rather than adding a fourth-style strength demand", () => {
     const { cycle, sessions } = setup();
     const swim = sessions.find(
