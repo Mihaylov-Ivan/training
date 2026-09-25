@@ -350,7 +350,7 @@ describe("smart schedule adjustment", () => {
           session.day_role === "daily_skill_practice" &&
           session.status === "scheduled",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("climbing becomes a gym workout when readiness supports the closest training stimulus", () => {
@@ -377,6 +377,14 @@ describe("smart schedule adjustment", () => {
       "routine-gym-replacement",
     );
     expect(respectsMainWorkoutBoundaries(result.updated_sessions)).toBe(true);
+    expect(
+      result.updated_sessions.some(
+        (session) =>
+          session.date === climbing.date &&
+          session.day_role === "daily_skill_practice" &&
+          session.status === "scheduled",
+      ),
+    ).toBe(true);
   });
 
   it("persists a smart date swap through schedule regeneration / refresh", () => {
