@@ -119,11 +119,15 @@ function scheduleKey(session: ScheduledSession): string {
   return `${session.date}:${scheduleSlot(session)}`;
 }
 
+function embedsDailySkill(role: DayRole): boolean {
+  return isMainWorkoutRoleLocal(role) && role !== "gym_workout";
+}
+
 function needsSeparateDailySkill(role: DayRole): boolean {
   return (
     role !== "daily_skill_practice" &&
     role !== "recovery" &&
-    !isMainWorkoutRoleLocal(role)
+    !embedsDailySkill(role)
   );
 }
 
@@ -159,7 +163,7 @@ export function canonicalizeLiveScheduleRows(
 
   const mainDates = new Set(
     [...liveByKey.values()]
-      .filter((session) => isMainWorkoutRoleLocal(session.day_role))
+      .filter((session) => embedsDailySkill(session.day_role))
       .map((session) => session.date),
   );
 
