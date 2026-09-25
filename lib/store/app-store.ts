@@ -547,6 +547,47 @@ export const useAppStore = create<AppState>()(
       startSessionFromScheduled: (scheduledId) => {
         const sched = get().scheduledSessions.find((s) => s.id === scheduledId);
         if (!sched) throw new Error("Scheduled session not found");
+
+        if (
+          ["completed", "partially_completed", "missed", "skipped", "cancelled"].includes(
+            sched.status,
+          )
+        ) {
+          throw new Error("This scheduled session can no longer be started");
+        }
+
+        // Re-opening a future/today scheduled workout should continue the same
+        // training session rather than create a duplicate.
+        const existing = [...get().trainingSessions]
+          .filter(
+            (training) =>
+              training.scheduled_session_id === scheduledId &&
+              training.status !== "abandoned",
+          )
+          .sort((a, b) =>
+            (b.started_at ?? "").localeCompare(a.started_at ?? ""),
+          )[0];
+
+        if (existing && !existing.ended_at) {
+          const orderedItems = get()
+            .sessionItems.filter(
+              (item) => item.training_session_id === existing.id,
+            )
+            .sort((a, b) => a.sequence - b.sequence);
+          const nextIndex = Math.max(
+            0,
+            orderedItems.findIndex(
+              (item) => item.status === "active" || item.status === "pending",
+            ),
+          );
+          set({
+            currentSessionId: existing.id,
+            currentItemIndex: nextIndex,
+            awaitingCompletion: false,
+          });
+          return existing.id;
+        }
+
         const routine = getRoutineById(sched.routine_template_id);
         if (!routine) throw new Error("Routine not found");
         const { session, items } = snapshotSession({
@@ -557,21 +598,44 @@ export const useAppStore = create<AppState>()(
           states: get().progressionStates,
           dayRole: sched.day_role,
         });
-        // Stamp create time so Today can attribute planned sessions to a day.
+
+        // The workout may belong to a future calendar day, but the actual
+        // execution timestamps describe when the athlete really performed it.
         session.started_at = new Date().toISOString();
         const todayWb = get().wellbeingCheckins.find((w) => w.date === todayISO());
         session.readiness_snapshot = todayWb ?? null;
-        set((s) => ({
-          trainingSessions: [...s.trainingSessions, session],
-          sessionItems: [...s.sessionItems, ...items],
+
+        const updatedScheduled = get().scheduledSessions.map((row) =>
+          row.id === scheduledId
+            ? { ...row, status: "in_progress" as const }
+            : row,
+        );
+
+        set((state) => ({
+          scheduledSessions: updatedScheduled,
+          trainingSessions: [...state.trainingSessions, session],
+          sessionItems: [...state.sessionItems, ...items],
           currentSessionId: session.id,
           currentItemIndex: 0,
           awaitingCompletion: false,
           activeTimer: null,
+          pendingMissedSessionId:
+            state.pendingMissedSessionId === scheduledId
+              ? null
+              : state.pendingMissedSessionId,
+          missPromptMode:
+            state.pendingMissedSessionId === scheduledId
+              ? null
+              : state.missPromptMode,
         }));
-        queueOrSync(() =>
-          syncTrainingSessionBundle({ session, items }),
+
+        const updatedSched = updatedScheduled.find(
+          (row) => row.id === scheduledId,
         );
+        queueOrSync(async () => {
+          await syncTrainingSessionBundle({ session, items });
+          if (updatedSched) await syncScheduledSessions([updatedSched]);
+        });
         return session.id;
       },
 
