@@ -393,7 +393,7 @@ export const useAppStore = create<AppState>()(
         const scheduled = generateScheduledSessions({
           userId,
           cycle,
-          weeksAhead: 6,
+          weeksAhead: 12,
           weekdayMap: draft.weekday_map,
         });
         const progressionStates = createInitialProgressionStates(draft, userId);
@@ -432,7 +432,7 @@ export const useAppStore = create<AppState>()(
         const next = generateScheduledSessions({
           userId: currentUserId(get),
           cycle: cycles[0],
-          weeksAhead: 6,
+          weeksAhead: 12,
           weekdayMap: schedulePrefs?.weekday_map,
           existing: before,
         });
@@ -486,7 +486,7 @@ export const useAppStore = create<AppState>()(
           scheduledSessions: state.scheduledSessions,
           trainingSessions: state.trainingSessions,
           fromDate,
-          weeksAhead: 6,
+          weeksAhead: 12,
         });
         const nextPrefs: SchedulePreferences = {
           user_id: userId,
