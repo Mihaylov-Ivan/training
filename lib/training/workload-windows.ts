@@ -150,6 +150,35 @@ function completedCredits(opts: {
   }, 0);
 }
 
+function dateTargetReached(opts: {
+  sessions: ScheduledSession[];
+  rule: QualityRule;
+  from: string;
+  target: number;
+  through: string;
+}): string | null {
+  const rows = opts.sessions
+    .filter((session) => {
+      const credit = COMPLETION_CREDIT[session.status] ?? 0;
+      if (credit <= 0) return false;
+      if (!routineHasQuality(session.routine_template_id, opts.rule.blocks)) {
+        return false;
+      }
+      const date = completionDate(session);
+      return date >= opts.from && date <= opts.through;
+    })
+    .sort((a, b) =>
+      completionDate(a).localeCompare(completionDate(b)),
+    );
+
+  let total = 0;
+  for (const row of rows) {
+    total += COMPLETION_CREDIT[row.status] ?? 0;
+    if (total >= opts.target) return completionDate(row);
+  }
+  return null;
+}
+
 function projectEffectiveEnd(opts: {
   sessions: ScheduledSession[];
   rule: QualityRule;
@@ -258,10 +287,20 @@ export function calculateWorkloadWindows(opts: {
       1,
       Math.round(rule.baseDays / target),
     );
+    const targetReachedOn = triggered
+      ? dateTargetReached({
+          sessions: opts.sessions,
+          rule,
+          from: windowStart,
+          target,
+          through: opts.today,
+        })
+      : null;
+
     const effectiveEnd = triggered
       ? remaining <= 0
-        ? opts.today > nominalEnd
-          ? opts.today
+        ? targetReachedOn && targetReachedOn > nominalEnd
+          ? targetReachedOn
           : nominalEnd
         : projectEffectiveEnd({
             sessions: opts.sessions,
