@@ -6,9 +6,12 @@ import { useAppStore } from "@/lib/store/app-store";
 import { Card, PageHeader, Badge } from "@/components/ui/primitives";
 import { addDays, todayISO } from "@/lib/utils";
 import { adherenceMetrics } from "@/lib/training/adaptive-schedule";
+import { calculateWorkloadWindows } from "@/lib/training/workload-windows";
 
 export default function ProgressPage() {
   const scheduled = useAppStore((s) => s.scheduledSessions);
+  const cycles = useAppStore((s) => s.cycles);
+  const schedulePrefs = useAppStore((s) => s.schedulePrefs);
   const sessions = useAppStore((s) => s.trainingSessions);
   const states = useAppStore((s) => s.progressionStates);
   const events = useAppStore((s) => s.progressionEvents);
@@ -28,6 +31,20 @@ export default function ProgressPage() {
   }, [scheduled, today]);
 
   const adherence = useMemo(() => adherenceMetrics(scheduled), [scheduled]);
+  const activeCycle =
+    cycles.find((cycle) => cycle.status === "active") ?? cycles[0];
+  const workloadWindows = useMemo(
+    () =>
+      activeCycle
+        ? calculateWorkloadWindows({
+            cycle: activeCycle,
+            sessions: scheduled,
+            today,
+            weekdayMap: schedulePrefs?.weekday_map,
+          })
+        : [],
+    [activeCycle, scheduled, today, schedulePrefs?.weekday_map],
+  );
 
   const oahs = states.find((s) => s.scope_id === "oahs");
   const planche = states.find((s) => s.scope_id === "planche");
@@ -90,6 +107,50 @@ export default function ProgressPage() {
         </p>
       </Card>
 
+      <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
+        Workload windows
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {workloadWindows.map((window) => (
+          <Card
+            key={window.quality}
+            className={
+              window.extension_triggered
+                ? "border-warning/40 bg-warning-soft/20"
+                : ""
+            }
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{window.label}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {window.completed_exposures}/{window.target_exposures} required exposures
+                </p>
+              </div>
+              <Badge tone={window.extension_triggered ? "warning" : "success"}>
+                {window.extension_triggered ? "Extended" : "On track"}
+              </Badge>
+            </div>
+            {window.extension_triggered ? (
+              <p className="mt-3 text-sm">
+                {window.remaining_exposures > 0
+                  ? `${window.remaining_exposures} exposure${window.remaining_exposures === 1 ? "" : "s"} still required · effective end ${window.effective_end}`
+                  : `Required workload met · completed extension ended ${window.effective_end}`}
+              </p>
+            ) : (
+              <p className="mt-3 text-sm text-muted">
+                Base window: {window.base_days} days · nominal end {window.nominal_end}
+              </p>
+            )}
+            {window.extension_triggered && window.extension_days > 0 ? (
+              <p className="mt-1 text-xs text-muted">
+                Window extended by {window.extension_days} day
+                {window.extension_days === 1 ? "" : "s"} rather than adding catch-up sessions.
+              </p>
+            ) : null}
+          </Card>
+        ))}
+      </div>
       <Card className="mt-4">
         <p className="text-sm text-muted">Completed sessions (all time)</p>
         <p className="text-2xl font-semibold">{completedSessions}</p>
