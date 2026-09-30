@@ -428,6 +428,18 @@ export const useAppStore = create<AppState>()(
       ensureSchedule: () => {
         const { cycles, scheduledSessions, schedulePrefs, profile } = get();
         if (!profile || !cycles[0]) return;
+        const normalizedProfile =
+          profile.smallest_load_increment_kg === 2.5
+            ? profile
+            : {
+                ...profile,
+                smallest_load_increment_kg: 2.5,
+                updated_at: new Date().toISOString(),
+              };
+        if (normalizedProfile !== profile) {
+          set({ profile: normalizedProfile });
+          queueOrSync(() => syncProfile(normalizedProfile));
+        }
         const before = normalizeScheduledSessions(scheduledSessions);
         const next = generateScheduledSessions({
           userId: currentUserId(get),
