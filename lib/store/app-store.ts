@@ -912,12 +912,22 @@ export const useAppStore = create<AppState>()(
         };
       }
 
+      const actualLoads = get().setResults
+        .filter((row) => row.session_item_id === item.id)
+        .map((row) => row.actual.load_kg)
+        .filter((load): load is number => typeof load === "number");
+      const actualLoadKg =
+        actualLoads.length > 0
+          ? actualLoads[actualLoads.length - 1]!
+          : undefined;
+
       const result = evaluateProgression(state, {
           ...input,
           ruleCode,
           userId: currentUserId(get),
           metrics: {
             ...input.metrics,
+            actual_load_kg: actualLoadKg,
             protocol: item.prescription_snapshot.protocol,
             oahs_protocol:
               item.prescription_snapshot.extras?.oahs_protocol,
