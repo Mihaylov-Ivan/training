@@ -42,7 +42,7 @@ export default function SettingsPage() {
             Load increment (kg)
             <input
               type="number"
-              step="0.5"
+              step="2.5"
               className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-3"
               value={profile.smallest_load_increment_kg}
               onChange={(e) =>
