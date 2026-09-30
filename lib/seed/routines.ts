@@ -112,6 +112,30 @@ function plancheItem(sequence: number, protocol: "hard" | "medium" | "light"): R
   });
 }
 
+function ironCrossItem(
+  sequence: number,
+  opts: { sets?: number; holdSeconds?: number; support?: string } = {},
+): RoutineItemDef {
+  const support = opts.support ?? "supported_mid_forearm";
+  return item({
+    sequence,
+    exercise_slug: "iron-cross-hold",
+    block: "skill",
+    prescription: {
+      sets: opts.sets ?? 3,
+      hold_seconds: opts.holdSeconds ?? 12,
+      exercise_level: support,
+      rest_seconds: 90,
+      notes:
+        "Assisted Iron Cross: straight arms, active shoulders, controlled support. Reduce assistance only when all holds are clean.",
+      extras: { support_level: support },
+    },
+    rest_seconds: 90,
+    progression_rule_code: "IRON_CROSS_V1",
+    progression_scope: "global_skill",
+  });
+}
+
 function dailySkillPrimerItems(): RoutineItemDef[] {
   return [
     item({
@@ -123,6 +147,28 @@ function dailySkillPrimerItems(): RoutineItemDef[] {
         rest_seconds: 0,
         notes: "Quick wrist prep before daily skills",
         extras: { forward: 10, lateral: 10 },
+      },
+      rest_seconds: 0,
+    }),
+    item({
+      exercise_slug: "scapular-push-up",
+      block: "warmup",
+      prescription: {
+        sets: 1,
+        reps_per_set: 8,
+        rest_seconds: 0,
+        notes: "Light shoulder/scapular preparation",
+      },
+      rest_seconds: 0,
+    }),
+    item({
+      exercise_slug: "scapular-pull-up",
+      block: "warmup",
+      prescription: {
+        sets: 1,
+        reps_per_set: 6,
+        rest_seconds: 0,
+        notes: "Light shoulder/scapular preparation",
       },
       rest_seconds: 0,
     }),
