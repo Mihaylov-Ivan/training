@@ -48,6 +48,7 @@ export default function ProgressPage() {
 
   const oahs = states.find((s) => s.scope_id === "oahs");
   const planche = states.find((s) => s.scope_id === "planche");
+  const ironCross = states.find((s) => s.scope_id === "iron_cross");
   const flag = states.find((s) => s.scope_id === "human_flag");
   const frontLever = states.find((s) => s.scope_id === "front_lever");
   const backLever = states.find((s) => s.scope_id === "back_lever");
@@ -176,6 +177,15 @@ export default function ProgressPage() {
             `Level: ${String(planche?.state.level ?? "—").replace(/_/g, " ")}`,
             `Hard holds: ${planche?.state.hard_hold_seconds ?? "—"}s`,
             `Hard credits: ${planche?.state.hard_success_credits ?? 0}/2`,
+          ]}
+        />
+        <SkillCard
+          title="Iron Cross"
+          href="/progress/iron-cross-hold"
+          lines={[
+            `Level: ${String(ironCross?.state.level ?? "supported mid forearm").replace(/_/g, " ")}`,
+            `Hold target: ${ironCross?.state.hold_seconds ?? 12}s`,
+            `Credits: ${ironCross?.state.success_credits ?? 0}/3`,
           ]}
         />
         <SkillCard
