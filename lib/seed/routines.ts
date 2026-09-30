@@ -1377,7 +1377,11 @@ function circuitRoundItems(
   variant: "A" | "B",
 ): RoutineItemDef[] {
   const circuitId = `circuit-${variant}-r${round}`;
-  const commonExtras = { circuit_id: circuitId, circuit_round: round };
+  const commonExtras = {
+    circuit_id: circuitId,
+    circuit_round: round,
+    circuit_with: true,
+  };
   const lastExtras = {
     ...commonExtras,
     round_rest_seconds: round === 1 ? 240 : 0,
@@ -1647,7 +1651,14 @@ const murphItems: RoutineItemDef[] = [
       rest_seconds: 0,
       notes:
         "20 rounds: 5 pull-ups + 10 push-ups + 15 squats. Bodyweight by default; no vest unless the full session is comfortably controlled.",
-      extras: { pullups: 5, pushups: 10, squats: 15, vest_kg: 0 },
+      extras: {
+        pullups: 5,
+        pushups: 10,
+        squats: 15,
+        vest_kg: 0,
+        circuit_with: true,
+        continuous_circuit: true,
+      },
     },
     rest_seconds: 0,
   }),
