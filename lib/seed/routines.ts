@@ -133,6 +133,7 @@ function ironCrossItem(
     rest_seconds: 90,
     progression_rule_code: "IRON_CROSS_V1",
     progression_scope: "global_skill",
+    level_from_state: true,
   });
 }
 
