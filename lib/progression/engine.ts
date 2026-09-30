@@ -307,6 +307,80 @@ export function evaluateProgression(
       }
       break;
     }
+    case "IRON_CROSS_V1": {
+      const levels = [
+        "supported_mid_forearm",
+        "supported_lower_forearm",
+        "supported_wrist",
+        "light_band_assisted",
+        "unassisted",
+      ] as const;
+      const level = String(
+        state.state.level ??
+          state.current_level ??
+          "supported_mid_forearm",
+      );
+      state.state.level = level;
+      state.current_level = level;
+      const hold = Number(state.state.hold_seconds ?? 12);
+
+      if (yes && (input.difficulty == null || input.difficulty <= 8)) {
+        const credits = Number(state.state.success_credits ?? 0) + 1;
+        state.state.success_credits = credits;
+        state.success_credits = credits;
+
+        if (credits >= 3) {
+          state.state.success_credits = 0;
+          state.success_credits = 0;
+
+          if (hold < 20) {
+            const nextHold = Math.min(20, hold + 2);
+            state.state.hold_seconds = nextHold;
+            eventType = "advance";
+            explanation =
+              `3 clean Iron Cross sessions → hold target increased to ${nextHold}s at ${level.replace(/_/g, " ")}.`;
+            preview =
+              `Next: 3 × ${nextHold}s @ ${level.replace(/_/g, " ")}`;
+          } else {
+            const index = levels.indexOf(
+              level as (typeof levels)[number],
+            );
+            const nextLevel =
+              index >= 0 && index < levels.length - 1
+                ? levels[index + 1]!
+                : levels[levels.length - 1]!;
+            state.state.level = nextLevel;
+            state.current_level = nextLevel;
+            state.state.hold_seconds =
+              nextLevel === "unassisted" ? 6 : 10;
+            eventType = nextLevel === level ? "hold" : "advance";
+            explanation =
+              nextLevel === level
+                ? "Iron Cross assistance is already at the final level — keep building clean unassisted hold quality."
+                : `20s controlled across 3 clean sessions → reduce assistance to ${nextLevel.replace(/_/g, " ")} and reset the hold target.`;
+            preview =
+              `Next: 3 × ${state.state.hold_seconds}s @ ${nextLevel.replace(/_/g, " ")}`;
+          }
+        } else {
+          eventType = "credit";
+          explanation =
+            `Iron Cross clean session — progression credit ${credits}/3.`;
+          preview =
+            `Current: 3 × ${hold}s @ ${level.replace(/_/g, " ")} · ${credits}/3 credits`;
+        }
+      } else {
+        state.state.success_credits = 0;
+        state.success_credits = 0;
+        eventType = yes ? "hold" : "failure";
+        explanation = yes
+          ? "Iron Cross completed at high effort — hold assistance and duration until it is controlled."
+          : "Iron Cross incomplete — hold assistance and duration.";
+        preview =
+          `Next: 3 × ${hold}s @ ${level.replace(/_/g, " ")}`;
+      }
+      break;
+    }
+
     case "HUMAN_FLAG_V1": {
       const ctx = input.flagContext ?? "monday";
       const key = ctx === "saturday" ? "saturday_hold_seconds" : "monday_hold_seconds";
