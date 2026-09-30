@@ -1127,6 +1127,17 @@ export const EXERCISES: ExerciseDef[] = [
     cues: ["Even effort", "Do not sprint the first run", "Save form for the second run"],
     common_mistakes: ["Starting too hard", "Letting fatigue destroy running mechanics"],
   },
+  {
+    id: "ex-murph-round",
+    slug: "murph-round",
+    name: "Murph partitioned round",
+    category: "conditioning",
+    metric_type: "circuit",
+    instructions:
+      "One round = 5 pull-ups, 10 push-ups and 15 bodyweight squats. Move continuously but keep every rep clean.",
+    cues: ["5 pull-ups", "10 push-ups", "15 squats", "Smooth sustainable pace"],
+    common_mistakes: ["Going to failure early", "Cutting range of motion", "Rushing squats under fatigue"],
+  },
 ];
 
 export function getExerciseBySlug(slug: string): ExerciseDef | undefined {
