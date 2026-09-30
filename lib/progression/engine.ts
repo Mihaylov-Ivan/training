@@ -717,7 +717,11 @@ function applyGenericVolumeRule(
 
   switch (code) {
     case "PULLUP_VOLUME_V1": {
-      let reps = Number(state.state.reps_per_set ?? 10);
+      let reps = Number(
+        state.state.reps_per_set ??
+          input.metrics?.prescribed_reps_per_set ??
+          10,
+      );
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 12) reps += 1;
       else {
@@ -733,7 +737,11 @@ function applyGenericVolumeRule(
       };
     }
     case "DIP_VOLUME_V1": {
-      let reps = Number(state.state.reps_per_set ?? 12);
+      let reps = Number(
+        state.state.reps_per_set ??
+          input.metrics?.prescribed_reps_per_set ??
+          12,
+      );
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 15) reps += 1;
       else {
