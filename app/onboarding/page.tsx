@@ -34,7 +34,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<OnboardingDraft>({
     units: "metric",
-    smallest_load_increment_kg: 1,
+    smallest_load_increment_kg: 2.5,
     pool_length_m: 25,
     equipment: {
       pull_up_bar: true,
@@ -113,7 +113,7 @@ export default function OnboardingPage() {
               Smallest load increment (kg)
               <input
                 type="number"
-                step="0.5"
+                step="2.5"
                 className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-3"
                 value={draft.smallest_load_increment_kg}
                 onChange={(e) =>
