@@ -73,7 +73,7 @@ describe("intensity rest", () => {
 });
 
 describe("normalizeRoutineItemOrder", () => {
-  it("places upper warmup first, then OAHS → planche → flag → levers, then lower warmup", () => {
+  it("places upper warmup first, then OAHS → planche → Iron Cross → flag → levers, then lower warmup", () => {
     const items: RoutineItemDef[] = [
       {
         id: "1",
@@ -131,6 +131,14 @@ describe("normalizeRoutineItemOrder", () => {
         prescription: { duration_seconds: 300, rest_seconds: 40 },
         rest_seconds: 40,
       },
+      {
+        id: "8",
+        exercise_slug: "iron-cross-hold",
+        sequence: 8,
+        block: "skill",
+        prescription: { sets: 3, hold_seconds: 12, rest_seconds: 90 },
+        rest_seconds: 90,
+      },
     ];
 
     const ordered = normalizeRoutineItemOrder(items).map((i) => i.exercise_slug);
@@ -138,6 +146,7 @@ describe("normalizeRoutineItemOrder", () => {
       "wrist-rocks",
       "oahs-practice",
       "planche-hold",
+      "iron-cross-hold",
       "one-leg-human-flag",
       "front-lever-hold",
       "back-lever-hold",
@@ -186,6 +195,11 @@ describe("estimateRoutineDurationMin", () => {
       "routine-wednesday-w4",
       "routine-saturday",
       "routine-climbing",
+      "routine-circuit-a",
+      "routine-circuit-b",
+      "routine-murph",
+      "routine-rings",
+      "routine-gym-replacement-skills",
     ]) {
       const routine = getRoutineById(id)!;
       const slugs = routine.items.map((item) => item.exercise_slug);
@@ -276,12 +290,13 @@ describe("estimateRoutineDurationMin", () => {
     const order = [
       slugs.indexOf("oahs-practice"),
       slugs.indexOf("planche-hold"),
+      slugs.indexOf("iron-cross-hold"),
       slugs.indexOf("one-leg-human-flag"),
       slugs.indexOf("front-lever-hold"),
       slugs.indexOf("back-lever-hold"),
     ];
     expect(slugs.indexOf("wrist-rocks")).toBeLessThan(order[0]!);
     expect(order).toEqual([...order].sort((x, y) => x - y));
-    expect(order[4]!).toBeLessThan(slugs.indexOf("air-squat"));
+    expect(order[5]!).toBeLessThan(slugs.indexOf("air-squat"));
   });
 });
