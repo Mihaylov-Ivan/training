@@ -69,6 +69,9 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
   const [actualReps, setActualReps] = useState<number | null>(
     current?.prescription_snapshot.reps_per_set ?? null,
   );
+  const [actualLoad, setActualLoad] = useState<number | null>(
+    current?.prescription_snapshot.load_kg ?? null,
+  );
 
   useWakeLock(session?.status === "active" || session?.status === "resting");
 
@@ -112,6 +115,7 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
   if (prevRepsKey !== repsKey) {
     setPrevRepsKey(repsKey);
     setActualReps(current?.prescription_snapshot.reps_per_set ?? null);
+    setActualLoad(current?.prescription_snapshot.load_kg ?? null);
     setLastPreview(null);
   }
 
@@ -217,7 +221,7 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
       actual: {
         reps: actualReps ?? undefined,
         hold_seconds: current!.prescription_snapshot.hold_seconds ?? undefined,
-        load_kg: current!.prescription_snapshot.load_kg ?? undefined,
+        load_kg: actualLoad ?? current!.prescription_snapshot.load_kg ?? undefined,
         distance_m: current!.prescription_snapshot.distance_m ?? undefined,
         duration_seconds:
           current!.prescription_snapshot.duration_seconds ?? undefined,
@@ -356,11 +360,35 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
                     current.prescription_snapshot.reps_per_set ??
                     "—")}
           </p>
-          {current.prescription_snapshot.load_kg != null &&
-          current.prescription_snapshot.load_kg > 0 ? (
-            <p className="mt-2 text-center text-lg text-muted">
-              +{current.prescription_snapshot.load_kg} kg
-            </p>
+          {exercise?.metric_type === "load_reps" ? (
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <SecondaryButton
+                aria-label="Decrease actual load"
+                onClick={() =>
+                  setActualLoad((load) =>
+                    Math.max(0, Number(((load ?? 0) - 2.5).toFixed(1))),
+                  )
+                }
+              >
+                −2.5
+              </SecondaryButton>
+              <div className="min-w-24 text-center">
+                <p className="text-xs text-muted">Actual load</p>
+                <p className="text-lg font-semibold tabular-nums">
+                  {actualLoad ?? 0} kg
+                </p>
+              </div>
+              <SecondaryButton
+                aria-label="Increase actual load"
+                onClick={() =>
+                  setActualLoad((load) =>
+                    Number(((load ?? 0) + 2.5).toFixed(1)),
+                  )
+                }
+              >
+                +2.5
+              </SecondaryButton>
+            </div>
           ) : null}
           {current.prescription_snapshot.exercise_level ? (
             <p className="mt-1 text-center text-sm text-muted">
