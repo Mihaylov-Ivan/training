@@ -19,6 +19,7 @@ function findState(
     const map: Record<string, string> = {
       "oahs-practice": "oahs",
       "planche-hold": "planche",
+      "iron-cross-hold": "iron_cross",
       "one-leg-human-flag": "human_flag",
       "front-lever-hold": "front_lever",
       "back-lever-hold": "back_lever",
@@ -106,6 +107,20 @@ export function resolvePrescription(
         p.extras?.daily_primer === true
           ? `5-min light OAHS technique @ ${String(p.exercise_level).replace(/_/g, " ")} — quality first`
           : `OAHS level: ${String(p.exercise_level).replace(/_/g, " ")}`;
+    }
+    if (item.exercise_slug === "iron-cross-hold") {
+      p.exercise_level = (state.current_level ??
+        state.state.level ??
+        p.exercise_level ??
+        "supported_mid_forearm") as string;
+      if (typeof state.state.hold_seconds === "number") {
+        p.hold_seconds = Number(state.state.hold_seconds);
+      }
+      p.notes = `Iron Cross @ ${String(p.exercise_level).replace(/_/g, " ")} · straight arms, active shoulders, controlled assistance`;
+      p.extras = {
+        ...p.extras,
+        support_level: p.exercise_level,
+      };
     }
     if (item.exercise_slug === "one-leg-human-flag") {
       const ctx =
