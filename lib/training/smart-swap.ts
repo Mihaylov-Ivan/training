@@ -234,104 +234,211 @@ function reconcileDailySkillSlots(
   return canonicalizeLiveScheduleRows(working);
 }
 
-function isAutomaticSubstitute(
-  session: ScheduledSession,
-): boolean {
-  return session.missed_note?.startsWith("Automatic substitute:") ?? false;
+const FIXED_REPLACEMENT_PREFIX = "Fixed replacement:";
+const MOVED_ORIGINAL_PREFIX = "Moved original after replacement:";
+
+function isFixedReplacement(session: ScheduledSession): boolean {
+  return session.missed_note?.startsWith(FIXED_REPLACEMENT_PREFIX) ?? false;
 }
 
-function withSubstitute(
+function replacementHistory(
   session: ScheduledSession,
-  role: DayRole,
-  routineId: string,
-  note: string,
-  date = session.date,
-  sequenceIndex = 0,
-): ScheduledSession {
+): Array<"boxing" | "gym"> {
+  const note = session.missed_note ?? "";
+  const match = /replacement-history=([a-z,]+)/.exec(note);
+  if (!match) return [];
+  return match[1]!
+    .split(",")
+    .filter(
+      (value): value is "boxing" | "gym" =>
+        value === "boxing" || value === "gym",
+    );
+}
+
+function chooseReplacement(opts: {
+  target: ScheduledSession;
+  sessions: ScheduledSession[];
+  checkins: WellbeingCheckin[];
+}): {
+  role: "boxing" | "gym_workout";
+  routineId: string;
+  historyToken: "boxing" | "gym";
+} | null {
+  const history = replacementHistory(opts.target);
+  const unused = (["boxing", "gym"] as const).filter(
+    (candidate) => !history.includes(candidate),
+  );
+  if (unused.length === 0) return null;
+
+  let choice: "boxing" | "gym";
+  if (history.length > 0) {
+    choice = unused[0]!;
+  } else if (opts.target.day_role === "climbing") {
+    const checkin = latestRelevantCheckin(
+      opts.checkins,
+      opts.target.date,
+    );
+    const readiness = readinessPercent(checkin);
+    const lowReadiness = readiness != null && readiness < 50;
+    const elevatedPain =
+      checkin != null &&
+      Math.max(
+        checkin.neck_pain_0_10,
+        checkin.back_pain_0_10,
+      ) >= 5;
+    const weekStart = calendarWeekStart(opts.target.date);
+    const weekEnd = addDays(weekStart, 6);
+    const gymAlreadyThisWeek = opts.sessions.some(
+      (session) =>
+        session.date >= weekStart &&
+        session.date <= weekEnd &&
+        session.day_role === "gym_workout" &&
+        MAIN_LOAD.has(session.status),
+    );
+    choice =
+      lowReadiness || elevatedPain || gymAlreadyThisWeek
+        ? "boxing"
+        : "gym";
+  } else {
+    // Swimming is primarily conditioning, so Boxing is the closest default.
+    // If the moved original is substituted again, Gym becomes the next option.
+    choice = "boxing";
+  }
+
+  if (choice === "boxing") {
+    return {
+      role: "boxing",
+      routineId: "routine-boxing",
+      historyToken: "boxing",
+    };
+  }
+
+  const targetEmbeddedSkills =
+    scheduledSessionEmbedsDailySkill(opts.target);
   return {
-    ...session,
-    date,
-    day_role: role,
-    routine_template_id: routineId,
-    sequence_index: sequenceIndex,
-    generated_from_schedule: false,
-    auto_rescheduled: false,
-    manually_rescheduled: false,
-    reschedule_count: (session.reschedule_count ?? 0) + 1,
-    missed_note: note,
+    role: "gym_workout",
+    routineId: targetEmbeddedSkills
+      ? "routine-gym-replacement-skills"
+      : "routine-gym-replacement",
+    historyToken: "gym",
   };
 }
 
-function placeRepeatedGymSubstitute(opts: {
+function makeFixedReplacement(opts: {
   target: ScheduledSession;
-  sessions: ScheduledSession[];
-  cycle: TrainingCycle;
+  replacement: {
+    role: "boxing" | "gym_workout";
+    routineId: string;
+  };
   oldName: string;
-}): SmartScheduleResult {
-  const { target, sessions, cycle, oldName } = opts;
-  const gymName =
-    getRoutineById("routine-gym-replacement")?.name ??
-    "Gym replacement";
+  newName: string;
+}): ScheduledSession {
+  return {
+    ...opts.target,
+    id: uid("sched"),
+    date: opts.target.date,
+    original_date: opts.target.date,
+    day_role: opts.replacement.role,
+    routine_template_id: opts.replacement.routineId,
+    status: "scheduled",
+    generated_from_schedule: false,
+    completed_at: null,
+    missed_reason: null,
+    sequence_index: 0,
+    auto_rescheduled: false,
+    manually_rescheduled: false,
+    rescheduled_from_id: null,
+    missed_note:
+      `${FIXED_REPLACEMENT_PREFIX} ${opts.oldName} → ${opts.newName}`,
+    injury_area: null,
+    injury_exercise: null,
+  };
+}
 
-  const otherMainSameDay = sessions.some(
-    (session) =>
-      session.id !== target.id &&
-      session.date === target.date &&
-      isMainWorkoutRole(session.day_role) &&
-      MAIN_LOAD.has(session.status),
+function cleanAdaptiveMoveProposal(opts: {
+  proposal: ReturnType<typeof recalculateSchedule>;
+  sourceSessions: ScheduledSession[];
+  target: ScheduledSession;
+  replacementId: string;
+  replacementHistory: Array<"boxing" | "gym">;
+}): {
+  sessions: ScheduledSession[];
+  movedTarget: ScheduledSession | null;
+  affectedDates: string[];
+} {
+  const sourceById = new Map(
+    opts.sourceSessions.map((session) => [session.id, session]),
   );
-  if (otherMainSameDay) {
-    return {
-      changed: false,
-      updated_sessions: sessions,
-      explanation:
-        "Gym cannot replace Boxing on this same day because another main workout is already scheduled there. Boxing was kept so no workout disappears.",
-      action: "none",
-    };
+  const makeupRows = opts.proposal.updated_sessions.filter(
+    (session) => session.rescheduled_from_id,
+  );
+  const targetMakeup = makeupRows.find(
+    (session) => session.rescheduled_from_id === opts.target.id,
+  );
+  const movedSourceIds = new Set(
+    makeupRows
+      .map((session) => session.rescheduled_from_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const skippedSupportIds = new Set(
+    opts.proposal.skipped_sessions
+      .filter(
+        (session) =>
+          session.id !== opts.target.id &&
+          !isMainWorkoutRole(session.day_role),
+      )
+      .map((session) => session.id),
+  );
+
+  let movedTarget: ScheduledSession | null = null;
+  const cleaned = opts.proposal.updated_sessions
+    .filter(
+      (session) =>
+        !movedSourceIds.has(session.id) &&
+        !skippedSupportIds.has(session.id),
+    )
+    .map((session) => {
+      if (!session.rescheduled_from_id) return session;
+      const source = sourceById.get(session.rescheduled_from_id);
+      if (!source) return session;
+
+      const isTarget = source.id === opts.target.id;
+      const moved: ScheduledSession = {
+        ...session,
+        original_date: source.original_date,
+        routine_template_id: source.routine_template_id,
+        day_role: source.day_role,
+        status: "scheduled",
+        completed_at: null,
+        missed_reason: null,
+        sequence_index: source.sequence_index,
+        rescheduled_from_id: null,
+        generated_from_schedule: false,
+        manually_rescheduled: false,
+        auto_rescheduled: true,
+        missed_note: isTarget
+          ? `${MOVED_ORIGINAL_PREFIX} from ${source.date}; replacement-history=${opts.replacementHistory.join(",")}`
+          : `Automatic cascade from ${source.date}`,
+      };
+      if (isTarget) movedTarget = moved;
+      return moved;
+    });
+
+  if (!movedTarget && targetMakeup) {
+    movedTarget =
+      cleaned.find((session) => session.id === targetMakeup.id) ?? null;
   }
 
-  // Repeated Auto substitute is an explicit same-day replacement. Do not
-  // silently move it elsewhere: Swimming → Boxing → Gym remains on the
-  // original selected calendar day.
-  let proposed = sessions.map((session) =>
-    session.id === target.id
-      ? withSubstitute(
-          session,
-          "gym_workout",
-          "routine-gym-replacement",
-          `Automatic substitute: ${oldName} → ${gymName}`,
-          target.date,
-          0,
-        )
-      : session,
-  );
-  proposed = canonicalizeLiveScheduleRows(proposed);
-
-  // The user-defined hard limits still apply. Recovery spacing is a softer
-  // planning preference and must not cause an explicit substitute to vanish
-  // or move to another day.
-  if (!respectsMainWorkoutBoundaries(proposed)) {
-    return {
-      changed: false,
-      updated_sessions: sessions,
-      explanation:
-        "Gym cannot replace this session on the same day because it would exceed the hard limit of one main workout per day or four main workouts in the calendar week.",
-      action: "none",
-    };
+  const affected = new Set<string>([opts.target.date]);
+  for (const move of opts.proposal.moved_sessions) {
+    affected.add(move.from_date);
+    affected.add(move.to_date);
   }
-
-  proposed = reconcileDailySkillSlots(
-    proposed,
-    [target.date],
-    target.user_id,
-    cycle,
-  );
 
   return {
-    changed: true,
-    updated_sessions: proposed,
-    explanation: `${oldName} was replaced with ${gymName} on the same day.`,
-    action: "substitute",
+    sessions: cleaned,
+    movedTarget,
+    affectedDates: [...affected],
   };
 }
 
@@ -342,162 +449,135 @@ function substitute(
   checkins: WellbeingCheckin[],
   today: string,
 ): SmartScheduleResult {
-  const oldName =
-    getRoutineById(target.routine_template_id)?.name ??
-    target.day_role.replaceAll("_", " ");
-
-  // Repeated Auto substitute advances to the next viable alternative.
-  if (isAutomaticSubstitute(target) && target.day_role === "boxing") {
-    return placeRepeatedGymSubstitute({
-      target,
-      sessions,
-      cycle,
-      oldName,
-    });
-  }
-
-  if (isAutomaticSubstitute(target) && target.day_role === "gym_workout") {
+  if (isFixedReplacement(target)) {
     return {
       changed: false,
       updated_sessions: sessions,
       explanation:
-        "Gym workout is already the final venue-independent substitute for this session.",
+        "This is a fixed replacement. Adjust the moved original workout if you still cannot perform the original activity.",
       action: "none",
     };
   }
 
-  const checkin = latestRelevantCheckin(checkins, target.date);
-  const readiness = readinessPercent(checkin);
-  const lowReadiness =
-    readiness != null && readiness < 50;
-  const elevatedPain =
-    checkin != null &&
-    Math.max(checkin.neck_pain_0_10, checkin.back_pain_0_10) >= 5;
+  const oldName =
+    getRoutineById(target.routine_template_id)?.name ??
+    target.day_role.replaceAll("_", " ");
+  const replacement = chooseReplacement({
+    target,
+    sessions,
+    checkins,
+  });
 
-  const weekStart = calendarWeekStart(target.date);
-  const weekEnd = addDays(weekStart, 6);
-  const weekRows = sessions.filter(
-    (session) =>
-      session.date >= weekStart && session.date <= weekEnd,
-  );
-
-  const missedMain = weekRows.some(
-    (session) =>
-      isMainWorkoutRole(session.day_role) &&
-      ["missed", "skipped", "cancelled"].includes(session.status),
-  );
-
-  let replacementRole: DayRole;
-  let replacementRoutineId: string;
-
-  if (target.day_role === "climbing") {
-    const gymAlreadyThisWeek = weekRows.some(
-      (session) =>
-        session.day_role === "gym_workout" &&
-        MAIN_LOAD.has(session.status),
-    );
-    if (lowReadiness || elevatedPain || gymAlreadyThisWeek) {
-      replacementRole = "boxing";
-      replacementRoutineId = "routine-boxing";
-    } else {
-      replacementRole = "gym_workout";
-      replacementRoutineId = "routine-gym-replacement";
-    }
-  } else {
-    // Swimming is conditioning/recovery. Only turn it into another main
-    // strength session when the week has actually lost a main stimulus,
-    // readiness is good, and the hard recovery constraints still allow it.
-    replacementRole = "boxing";
-    replacementRoutineId = "routine-boxing";
-
-    if (missedMain && (readiness == null || readiness >= 65)) {
-      const proposed = sessions.map((session) =>
-        session.id === target.id
-          ? {
-              ...session,
-              day_role: "gym_workout" as DayRole,
-              routine_template_id: "routine-gym-replacement",
-              sequence_index: 0,
-            }
-          : session,
-      );
-      if (isValidMainLayout(proposed)) {
-        replacementRole = "gym_workout";
-        replacementRoutineId = "routine-gym-replacement";
-      }
-    }
+  if (!replacement) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "Boxing and Gym have already both been used as replacements for this original workout chain. The original workout was left in place.",
+      action: "none",
+    };
   }
 
   const newName =
-    getRoutineById(replacementRoutineId)?.name ??
-    replacementRole.replaceAll("_", " ");
+    getRoutineById(replacement.routineId)?.name ??
+    replacement.role.replaceAll("_", " ");
+  const fixedReplacement = makeFixedReplacement({
+    target,
+    replacement,
+    oldName,
+    newName,
+  });
 
-  let updated = sessions.map((session) =>
-    session.id === target.id
+  // Climbing uses the generic main-workout cascade here so the original
+  // climbing stimulus can move while the fixed replacement reserves the old
+  // date. This lets downstream mains shift safely instead of deleting climb.
+  const planningTarget =
+    target.day_role === "climbing"
+      ? {
+          ...target,
+          day_role: "calisthenics_volume" as DayRole,
+        }
+      : target;
+
+  const sourceWithReplacement = [...sessions, fixedReplacement];
+  const proposal = recalculateSchedule({
+    missedSession: planningTarget,
+    upcomingSessions: sourceWithReplacement,
+    cycle,
+    reason: "no_time",
+  });
+
+  const targetMakeup = proposal.updated_sessions.find(
+    (session) => session.rescheduled_from_id === target.id,
+  );
+  if (
+    proposal.recommendation !== "apply" ||
+    proposal.moved_sessions.length === 0 ||
+    !targetMakeup
+  ) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "No safe slot was available to move the original workout, so no replacement was inserted. The original schedule was kept intact.",
+      action: "none",
+    };
+  }
+
+  const history = [
+    ...replacementHistory(target),
+    replacement.historyToken,
+  ];
+  const cleaned = cleanAdaptiveMoveProposal({
+    proposal,
+    sourceSessions: sourceWithReplacement,
+    target,
+    replacementId: fixedReplacement.id,
+    replacementHistory: history,
+  });
+  if (!cleaned.movedTarget) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "The original workout could not be moved safely, so the replacement was cancelled.",
+      action: "none",
+    };
+  }
+
+  let updated = cleaned.sessions.map((session) =>
+    session.id === fixedReplacement.id
       ? {
           ...session,
-          day_role: replacementRole,
-          routine_template_id: replacementRoutineId,
-          sequence_index:
-            replacementRole === "gym_workout"
-              ? target.day_role === "climbing"
-                ? target.sequence_index
-                : 0
-              : 0,
-          generated_from_schedule: false,
-          auto_rescheduled: false,
-          manually_rescheduled: false,
-          reschedule_count: (session.reschedule_count ?? 0) + 1,
-          missed_note: `Automatic substitute: ${oldName} → ${newName}`,
+          missed_note:
+            `${FIXED_REPLACEMENT_PREFIX} ${oldName} → ${newName}. Original moved to ${cleaned.movedTarget!.date}`,
         }
       : session,
   );
 
-  if (
-    replacementRole === "gym_workout" &&
-    !isValidMainLayout(updated)
-  ) {
-    replacementRole = "boxing";
-    replacementRoutineId = "routine-boxing";
-    const fallbackName =
-      getRoutineById(replacementRoutineId)?.name ?? "Boxing";
-    updated = sessions.map((session) =>
-      session.id === target.id
-        ? {
-            ...session,
-            day_role: "boxing" as DayRole,
-            routine_template_id: replacementRoutineId,
-            sequence_index: 0,
-            generated_from_schedule: false,
-            auto_rescheduled: false,
-            manually_rescheduled: false,
-            reschedule_count: (session.reschedule_count ?? 0) + 1,
-            missed_note: `Automatic substitute: ${oldName} → ${fallbackName}`,
-          }
-        : session,
-    );
-  }
-
   updated = reconcileDailySkillSlots(
     updated,
-    [target.date],
+    cleaned.affectedDates,
     target.user_id,
     cycle,
   );
+  updated = canonicalizeLiveScheduleRows(updated);
 
-  const reason =
-    replacementRole === "gym_workout"
-      ? target.day_role === "climbing"
-        ? "Gym was selected because it best preserves the climbing day's strength stimulus."
-        : "Gym was selected because this week has lost a main strength session and recovery spacing allows one to be restored."
-      : target.day_role === "climbing"
-        ? "Boxing was selected because current recovery/readiness or this week's load makes another gym-strength session less suitable."
-        : "Boxing was selected because it replaces swimming's conditioning stimulus without adding another main strength day.";
+  if (!respectsMainWorkoutBoundaries(updated)) {
+    return {
+      changed: false,
+      updated_sessions: sessions,
+      explanation:
+        "The replacement would exceed the hard limit of one main workout per day or four main workouts in the calendar week, so the original schedule was kept.",
+      action: "none",
+    };
+  }
 
   return {
     changed: true,
     updated_sessions: updated,
-    explanation: `${oldName} was automatically replaced with ${getRoutineById(replacementRoutineId)?.name ?? replacementRole}. ${reason}`,
+    explanation:
+      `${newName} is fixed on ${target.date}. The original ${oldName} moved to ${cleaned.movedTarget.date}. If the moved original still cannot be done, use Auto substitute on that moved original.`,
     action: "substitute",
   };
 }
@@ -767,6 +847,16 @@ export function smartAdjustScheduledSession(opts: {
     };
   }
 
+  if (isFixedReplacement(target)) {
+    return {
+      changed: false,
+      updated_sessions: opts.sessions,
+      explanation:
+        "Fixed replacements stay on their assigned date. Adjust the moved original workout instead.",
+      action: "none",
+    };
+  }
+
   if (target.day_role === "daily_skill_practice") {
     return {
       changed: false,
@@ -777,10 +867,7 @@ export function smartAdjustScheduledSession(opts: {
     };
   }
 
-  if (
-    SPECIAL_ROLES.has(target.day_role) ||
-    isAutomaticSubstitute(target)
-  ) {
+  if (SPECIAL_ROLES.has(target.day_role)) {
     return substitute(
       target,
       opts.sessions,
