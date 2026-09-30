@@ -73,23 +73,42 @@ export function evaluateProgression(
   }
 
   const yes = input.completedAll;
+  const actualLoadKg =
+    typeof input.metrics?.actual_load_kg === "number" &&
+    Number.isFinite(input.metrics.actual_load_kg)
+      ? Number(input.metrics.actual_load_kg)
+      : null;
+  const loadAwareRules = new Set([
+    "WEIGHTED_PULLUP_4X5_V1",
+    "STRICT_MUSCLE_UP_V1",
+    "SINGLE_LEG_RDL_V1",
+    "BULGARIAN_SPLIT_V1",
+    "PULLUP_VOLUME_V1",
+    "DIP_VOLUME_V1",
+    "PUSHUP_VOLUME_V1",
+    "WALKING_LUNGE_V1",
+    "CALF_RAISE_V1",
+  ]);
+  if (actualLoadKg != null && loadAwareRules.has(input.ruleCode)) {
+    state.state.load_kg = actualLoadKg;
+  }
 
   switch (input.ruleCode) {
     case "WEIGHTED_PULLUP_4X5_V1": {
       const load = Number(state.state.load_kg ?? 20);
       if (yes) {
-        state.state.load_kg = load + 1;
+        state.state.load_kg = load + 2.5;
         state.state.consecutive_failures = 0;
         state.consecutive_failures = 0;
         eventType = "success";
-        explanation = `Completed all reps @ +${load} kg → next load +${load + 1} kg.`;
-        preview = `Next: 4 × 5 @ +${load + 1} kg`;
+        explanation = `Completed all reps @ +${load} kg → next load +${load + 2.5} kg.`;
+        preview = `Next: 4 × 5 @ +${load + 2.5} kg`;
       } else {
         const fails = Number(state.state.consecutive_failures ?? 0) + 1;
         state.state.consecutive_failures = fails;
         state.consecutive_failures = fails;
         if (fails >= 2) {
-          state.state.load_kg = Math.max(0, load - 2);
+          state.state.load_kg = Math.max(0, load - 2.5);
           state.state.consecutive_failures = 0;
           state.consecutive_failures = 0;
           eventType = "failure";
@@ -361,9 +380,9 @@ export function evaluateProgression(
     case "SINGLE_LEG_RDL_V1": {
       const load = Number(state.state.load_kg ?? 0);
       if (yes && (input.difficulty == null || input.difficulty <= 8)) {
-        state.state.load_kg = load + 2;
+        state.state.load_kg = load + 2.5;
         eventType = "success";
-        explanation = `Single-leg RDL complete with control → +${load + 2} kg next time.`;
+        explanation = `Single-leg RDL complete with control → +${load + 2.5} kg next time.`;
       } else {
         eventType = yes ? "hold" : "failure";
         explanation = "Single-leg RDL held at the same load until both sides are controlled.";
@@ -406,16 +425,16 @@ export function evaluateProgression(
     case "BULGARIAN_SPLIT_V1": {
       const load = Number(state.state.load_kg ?? 0);
       if (yes) {
-        state.state.load_kg = load + 2;
+        state.state.load_kg = load + 2.5;
         state.state.consecutive_failures = 0;
         eventType = "success";
-        explanation = `Success → next load +${load + 2} kg.`;
-        preview = `Next: 3 × 8/leg @ +${load + 2} kg`;
+        explanation = `Success → next load +${load + 2.5} kg.`;
+        preview = `Next: 3 × 8/leg @ +${load + 2.5} kg`;
       } else {
         const fails = Number(state.state.consecutive_failures ?? 0) + 1;
         state.state.consecutive_failures = fails;
         if (fails >= 2) {
-          state.state.load_kg = Math.max(0, load - 2);
+          state.state.load_kg = Math.max(0, load - 2.5);
           state.state.consecutive_failures = 0;
           eventType = "failure";
           explanation = `Two failures → reduce to +${state.state.load_kg} kg.`;
@@ -433,10 +452,10 @@ export function evaluateProgression(
         state.state.success_credits = credits;
         state.state.fail_credits = 0;
         if (credits >= 2) {
-          state.state.load_kg = Number(state.state.load_kg ?? 0) + 1;
+          state.state.load_kg = Number(state.state.load_kg ?? 0) + 2.5;
           state.state.success_credits = 0;
           eventType = "success";
-          explanation = `2 clean sessions → +1 kg (now +${state.state.load_kg} kg).`;
+          explanation = `2 clean sessions → +2.5 kg (now +${state.state.load_kg} kg).`;
         } else {
           eventType = "credit";
           explanation = `Clean muscle-up session — credit ${credits}/2.`;
@@ -624,7 +643,7 @@ function applyGenericVolumeRule(
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 12) reps += 1;
       else {
-        load += 2;
+        load += 2.5;
         reps = 8;
       }
       state.state.reps_per_set = reps;
@@ -640,7 +659,7 @@ function applyGenericVolumeRule(
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 15) reps += 1;
       else {
-        load += 2;
+        load += 2.5;
         reps = 10;
       }
       state.state.reps_per_set = reps;
@@ -672,7 +691,7 @@ function applyGenericVolumeRule(
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 15) reps += 1;
       else {
-        load += 4;
+        load += 2.5;
         reps = 12;
       }
       state.state.reps_per_set = reps;
