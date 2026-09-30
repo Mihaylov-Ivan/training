@@ -541,7 +541,7 @@ export function recalculateSchedule(opts: {
     skipKinds.includes(kind) ||
     (kind === "DEEP_FLEXIBILITY" && preferRecovery) ||
     (kind === "DELOAD_WORKOUT" && !opts.manualTargetDate) ||
-    (streak >= 3 && kind !== "MAIN_WORKOUT" && kind !== "CLIMBING")
+    (streak >= 3 && !isMainWorkoutRole(missed.day_role) && kind !== "CLIMBING")
   ) {
     const marked = markTerminal(
       missed,
@@ -849,7 +849,7 @@ export function recalculateSchedule(opts: {
   // Optional: skip Saturday rather than squeeze before Monday
   if (
     opts.forceSkip ||
-    (kind === "MAIN_WORKOUT" &&
+    (isMainWorkoutRole(missed.day_role) &&
       weekday(missed.date) === 6 &&
       !opts.manualTargetDate &&
       reason === "intentional_rest")
