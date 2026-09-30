@@ -1854,9 +1854,40 @@ const climbItems: RoutineItemDef[] = [
   }),
   oahsItem(6),
   plancheItem(7, "hard"),
-  flagItem(8, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
+  ironCrossItem(8),
+  flagItem(9, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
   leverItem(9, "front-lever-hold", "light"),
   leverItem(10, "back-lever-hold", "light"),
+  item({
+    exercise_slug: "handstand-push-up",
+    block: "strength",
+    prescription: {
+      sets: 2,
+      reps_per_set: 5,
+      exercise_level: "wall",
+      rest_seconds: 150,
+      notes: "Light weekly frequency exposure before climbing; stop well before failure",
+    },
+    rest_seconds: 150,
+    level_from_state: true,
+    progression_rule_code: "HSPU_LEVEL_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "parallel-bar-dip",
+    block: "strength",
+    prescription: {
+      sets: 2,
+      reps_per_set: 8,
+      load_kg: 0,
+      rest_seconds: 90,
+      notes: "Light weekly dip exposure; leave 2–3 reps in reserve",
+    },
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "DIP_VOLUME_V1",
+    progression_scope: "routine_item",
+  }),
   item({
     sequence: 11,
     exercise_slug: "easy-climb-problems",
@@ -1985,7 +2016,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     id: "routine-sunday-skills",
     name: "Light OAHS + Planche",
     kind: "short",
-    description: "Separate 10-minute light skill practice · OAHS emphasis + planche",
+    description: "Wrist + scapular prep, then separate light OAHS + planche practice",
     day_roles: ["daily_skill_practice"],
     items: dailySkillItems,
   }),
@@ -1994,7 +2025,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Monday — Strength + Power",
     kind: "primary",
     description:
-      "Wrist/upper warmup → OAHS → Planche → Flag → Front lever → Back lever → lower-body warmup → HSPU → Muscle-up → Strength → Core → Splits",
+      "Wrist/upper warmup → OAHS → Planche → Iron Cross → Flag → Front lever → Back lever → lower-body warmup → HSPU → Muscle-up → Strength → Core → Splits",
     day_roles: ["strength_power"],
     items: mondayItems,
   }),
@@ -2080,6 +2111,51 @@ export const ROUTINES: RoutineTemplateDef[] = [
     items: gymReplacementItems,
   }),
   withEstimatedDuration({
+    id: "routine-gym-replacement-skills",
+    name: "Gym replacement — 45 min + daily skills",
+    kind: "primary",
+    description:
+      "Wrist/scapular prep + light OAHS + planche, then the exercise-only gym replacement and final stretching",
+    day_roles: ["gym_workout"],
+    items: gymReplacementWithSkillsItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-circuit-a",
+    name: "Circuit A — Strength conditioning",
+    kind: "primary",
+    description:
+      "Daily light skills + Iron Cross, then 2 circuit rounds with 4 min between rounds + stretching",
+    day_roles: ["circuit_workout"],
+    items: circuitAItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-circuit-b",
+    name: "Circuit B — Power conditioning",
+    kind: "primary",
+    description:
+      "Daily light skills + Iron Cross, then 2 circuit rounds with 4 min between rounds + stretching",
+    day_roles: ["circuit_workout"],
+    items: circuitBItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-murph",
+    name: "Murph — Work capacity",
+    kind: "primary",
+    description:
+      "Daily light skills + Iron Cross → 1.6 km run → 20 × (5 pull-ups, 10 push-ups, 15 squats) → 1.6 km run",
+    day_roles: ["murph"],
+    items: murphItems,
+  }),
+  withEstimatedDuration({
+    id: "routine-rings",
+    name: "Rings — Strength + skill",
+    kind: "primary",
+    description:
+      "Warmup → OAHS → Planche → Iron Cross → Flag → Front/Back lever → HSPU → ring strength/volume",
+    day_roles: ["rings_workout"],
+    items: ringsItems,
+  }),
+  withEstimatedDuration({
     id: "routine-boxing",
     name: "Boxing · 45 min",
     kind: "boxing",
@@ -2092,7 +2168,7 @@ export const ROUTINES: RoutineTemplateDef[] = [
     name: "Saturday — Calisthenics Volume + Work Capacity",
     kind: "primary",
     description:
-      "Wrist/upper warmup → OAHS → Planche → Flag → Front lever → Back lever → lower-body warmup → Muscle-up → Volume → Core → Conditioning → Flexibility",
+      "Wrist/upper warmup → OAHS → Planche → Iron Cross → Flag → Front lever → Back lever → lower-body warmup → HSPU → Muscle-up → Volume → Core → Conditioning → Flexibility",
     day_roles: ["calisthenics_volume"],
     items: saturdayItems,
   }),
@@ -2120,6 +2196,13 @@ export function getRoutineForDayRole(
   if (role === "swim_performance") return getRoutineById("routine-swim-perf")!;
   if (role === "swim_recovery") return getRoutineById("routine-swim-rec")!;
   if (role === "boxing") return getRoutineById("routine-boxing")!;
+  if (role === "circuit_workout") {
+    return getRoutineById(
+      cycleWeek === 2 ? "routine-circuit-a" : "routine-circuit-b",
+    )!;
+  }
+  if (role === "rings_workout") return getRoutineById("routine-rings")!;
+  if (role === "murph") return getRoutineById("routine-murph")!;
   if (role === "gym_workout") {
     return getRoutineById("routine-gym-replacement")!;
   }
