@@ -941,6 +941,8 @@ export const useAppStore = create<AppState>()(
           metrics: {
             ...input.metrics,
             actual_load_kg: actualLoadKg,
+            prescribed_reps_per_set:
+              item.prescription_snapshot.reps_per_set,
             protocol: item.prescription_snapshot.protocol,
             oahs_protocol:
               item.prescription_snapshot.extras?.oahs_protocol,
