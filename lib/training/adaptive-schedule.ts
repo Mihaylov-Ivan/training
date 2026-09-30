@@ -22,6 +22,9 @@ const MAIN_ROLES: DayRole[] = [
   "athleticism_endurance",
   "calisthenics_volume",
   "gym_workout",
+  "circuit_workout",
+  "rings_workout",
+  "murph",
   "climbing",
 ];
 
@@ -48,6 +51,9 @@ export function classifySession(
   const deload = session.is_deload || session.cycle_week === 4;
 
   if (role === "climbing") return "CLIMBING";
+  if (role === "rings_workout") return "RINGS";
+  if (role === "circuit_workout") return "CIRCUIT";
+  if (role === "murph") return "MURPH";
   if (role === "boxing") return "BOXING";
   if (role === "swim_performance" || role === "swim_recovery") return "SWIMMING";
   if (role === "daily_skill_practice") return "SKILL_PRACTICE";
