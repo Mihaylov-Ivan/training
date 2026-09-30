@@ -161,7 +161,9 @@ export function resolvePrescription(
       if (
         [
           "pull-up",
+          "ring-pull-up",
           "parallel-bar-dip",
+          "ring-dip",
           "inverted-row",
           "push-up",
           "walking-lunge",
