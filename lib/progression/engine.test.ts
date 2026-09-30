@@ -22,7 +22,7 @@ function state(partial: Partial<ProgressionState> & { state: Record<string, unkn
 }
 
 describe("WEIGHTED_PULLUP_4X5_V1", () => {
-  it("success at +20 kg -> +21 kg", () => {
+  it("success at +20 kg -> +22.5 kg", () => {
     const r = evaluateProgression(
       state({ state: { load_kg: 20, consecutive_failures: 0 } }),
       {
@@ -32,11 +32,26 @@ describe("WEIGHTED_PULLUP_4X5_V1", () => {
         userId: "u",
       },
     );
-    expect(r.state.state.load_kg).toBe(21);
-    expect(r.nextPrescriptionPreview).toContain("21");
+    expect(r.state.state.load_kg).toBe(22.5);
+    expect(r.nextPrescriptionPreview).toContain("22.5");
   });
 
-  it("two consecutive failures -> -2 kg", () => {
+  it("uses the actual performed load before applying the 2.5 kg step", () => {
+    const r = evaluateProgression(
+      state({ state: { load_kg: 20, consecutive_failures: 0 } }),
+      {
+        ruleCode: "WEIGHTED_PULLUP_4X5_V1",
+        completedAll: true,
+        sessionItemId: "si",
+        userId: "u",
+        metrics: { actual_load_kg: 22.5 },
+      },
+    );
+    expect(r.state.state.load_kg).toBe(25);
+    expect(r.nextPrescriptionPreview).toContain("25");
+  });
+
+  it("two consecutive failures -> -2.5 kg", () => {
     let s = state({ state: { load_kg: 20, consecutive_failures: 0 } });
     s = evaluateProgression(s, {
       ruleCode: "WEIGHTED_PULLUP_4X5_V1",
@@ -52,7 +67,7 @@ describe("WEIGHTED_PULLUP_4X5_V1", () => {
       sessionItemId: "si",
       userId: "u",
     }).state;
-    expect(s.state.load_kg).toBe(18);
+    expect(s.state.load_kg).toBe(17.5);
   });
 });
 
@@ -305,7 +320,7 @@ describe("undo", () => {
       sessionItemId: "si",
       userId: "u",
     });
-    expect(r.state.state.load_kg).toBe(21);
+    expect(r.state.state.load_kg).toBe(22.5);
     const restored = undoProgressionEvent(r.state, r.event);
     expect(restored.state.load_kg).toBe(20);
   });
