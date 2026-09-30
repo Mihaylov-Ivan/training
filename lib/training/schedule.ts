@@ -22,6 +22,7 @@ export function resolveDayRole(
   cycleWeek: 1 | 2 | 3 | 4,
   weekdayNum: number,
   weekdayMap?: SchedulePreferences["weekday_map"],
+  cycleBlockNumber = 1,
 ): DayRole {
   const mapped = weekdayMap?.[String(weekdayNum)];
   let role =
@@ -31,6 +32,15 @@ export function resolveDayRole(
   // Upgrade it to the daily skill-practice day so OAHS + planche remain daily.
   if (weekdayNum === 0 && role === "recovery") {
     role = "daily_skill_practice";
+  }
+
+  // Wednesday work-capacity rotation: two circuit exposures per 4-week
+  // block, with Murph replacing the second circuit every other block.
+  if (weekdayNum === 3 || role === "athleticism_endurance") {
+    if (cycleWeek === 2) return "circuit_workout";
+    if (cycleWeek === 4) {
+      return cycleBlockNumber % 2 === 0 ? "murph" : "circuit_workout";
+    }
   }
 
   // Occasional boxing replaces Thursday deep-flex in Weeks 1 and 3.
@@ -48,12 +58,10 @@ export function resolveDayRole(
     if (cycleWeek === 4) return "swim_recovery";
   }
 
-  // Saturday climbing week 3
-  if (
-    (weekdayNum === 6 || role === "calisthenics_volume") &&
-    cycleWeek === 3
-  ) {
-    return "climbing";
+  // Saturday rotation: rings twice per block, calisthenics once, climbing once.
+  if (weekdayNum === 6 || role === "calisthenics_volume") {
+    if (cycleWeek === 1 || cycleWeek === 4) return "rings_workout";
+    if (cycleWeek === 3) return "climbing";
   }
 
   return role;
@@ -68,6 +76,16 @@ export function cycleWeekForDate(
   const diff = Math.floor((d.getTime() - start.getTime()) / 86400000);
   const week = (Math.floor(diff / 7) % 4) + 1;
   return week as 1 | 2 | 3 | 4;
+}
+
+export function cycleBlockForDate(
+  startDate: string,
+  date: string,
+): number {
+  const start = new Date(startDate + "T12:00:00");
+  const d = new Date(date + "T12:00:00");
+  const diff = Math.floor((d.getTime() - start.getTime()) / 86400000);
+  return Math.floor(Math.max(0, diff) / 28) + 1;
 }
 
 export function createActiveCycle(
@@ -90,6 +108,9 @@ function isMainWorkoutRoleLocal(role: DayRole): boolean {
     "athleticism_endurance",
     "calisthenics_volume",
     "gym_workout",
+    "circuit_workout",
+    "rings_workout",
+    "murph",
     "climbing",
   ].includes(role);
 }
@@ -202,7 +223,8 @@ export function generateScheduledSessions(opts: {
 
     const cw = cycleWeekForDate(opts.cycle.start_date, session.date);
     const wd = weekday(session.date);
-    const baseRole = resolveDayRole(cw, wd, opts.weekdayMap);
+    const block = cycleBlockForDate(opts.cycle.start_date, session.date);
+    const baseRole = resolveDayRole(cw, wd, opts.weekdayMap, block);
 
     if (session.day_role === "daily_skill_practice") {
       const skillRoutine = getRoutineForDayRole(
@@ -283,7 +305,8 @@ export function generateScheduledSessions(opts: {
     const date = addDays(start, i);
     const cw = cycleWeekForDate(start, date);
     const wd = weekday(date);
-    const role = resolveDayRole(cw, wd, opts.weekdayMap);
+    const block = cycleBlockForDate(start, date);
+    const role = resolveDayRole(cw, wd, opts.weekdayMap, block);
     const routine = getRoutineForDayRole(role, cw);
 
     const dayKey = `${date}:day`;
@@ -348,6 +371,10 @@ export function isPrimaryRole(role: DayRole): boolean {
     "strength_power",
     "athleticism_endurance",
     "calisthenics_volume",
+    "circuit_workout",
+    "rings_workout",
+    "murph",
+    "gym_workout",
     "climbing",
     "swim_performance",
     "swim_recovery",
