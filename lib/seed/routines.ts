@@ -1362,6 +1362,460 @@ const gymReplacementItems: RoutineItemDef[] = [
 ];
 
 resetSeq();
+const gymReplacementWithSkillsItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
+  ...gymReplacementItems.map((entry, index) => ({
+    ...entry,
+    id: `ri-gym-with-skills-${index + 1}`,
+    sequence: 20 + index,
+  })),
+];
+
+function circuitRoundItems(
+  round: 1 | 2,
+  variant: "A" | "B",
+): RoutineItemDef[] {
+  const circuitId = `circuit-${variant}-r${round}`;
+  const commonExtras = { circuit_id: circuitId, circuit_round: round };
+  const lastExtras = {
+    ...commonExtras,
+    round_rest_seconds: round === 1 ? 240 : 0,
+  };
+
+  const rows =
+    variant === "A"
+      ? [
+          item({
+            exercise_slug: "battle-ropes",
+            block: "conditioning",
+            prescription: {
+              sets: 1,
+              reps_per_set: 40,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "shoulder-barbell-press",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 30,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "goblet-squat",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 12,
+              load_kg: 20,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "diamond-push-up",
+            block: "volume",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "wide-grip-pull-up",
+            block: "volume",
+            prescription: {
+              sets: 1,
+              reps_per_set: 8,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "dumbbell-bench-press",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 24,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "bulgarian-split-squat",
+            block: "legs",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 5,
+              per_side: true,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "sledge-push-pull",
+            block: "conditioning",
+            prescription: {
+              sets: 1,
+              reps_per_set: 4,
+              load_kg: 35,
+              rest_seconds: 0,
+              notes: "4 controlled push/pull runs",
+              extras: lastExtras,
+            },
+            rest_seconds: 0,
+          }),
+        ]
+      : [
+          item({
+            exercise_slug: "hanging-straight-leg-raise",
+            block: "core",
+            prescription: {
+              sets: 1,
+              reps_per_set: 15,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "shoulder-barbell-press",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 30,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "goblet-squat",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 12,
+              load_kg: 20,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "diamond-push-up",
+            block: "volume",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "wide-grip-pull-up",
+            block: "volume",
+            prescription: {
+              sets: 1,
+              reps_per_set: 8,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "dumbbell-bench-press",
+            block: "strength",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 24,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "bulgarian-split-squat",
+            block: "legs",
+            prescription: {
+              sets: 1,
+              reps_per_set: 10,
+              load_kg: 5,
+              per_side: true,
+              rest_seconds: 0,
+              extras: commonExtras,
+            },
+            rest_seconds: 0,
+          }),
+          item({
+            exercise_slug: "jumping-squat",
+            block: "power",
+            prescription: {
+              sets: 1,
+              reps_per_set: 12,
+              rest_seconds: 0,
+              notes: "Explosive reps; stop if jump height falls",
+              extras: lastExtras,
+            },
+            rest_seconds: 0,
+          }),
+        ];
+  return rows;
+}
+
+resetSeq();
+const circuitAItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
+  ironCrossItem(10, { holdSeconds: 10 }),
+  ...circuitRoundItems(1, "A"),
+  ...circuitRoundItems(2, "A"),
+  item({
+    exercise_slug: "couch-stretch",
+    block: "flexibility",
+    prescription: { sets: 1, hold_seconds: 45, per_side: true, rest_seconds: 15 },
+    rest_seconds: 15,
+  }),
+  item({
+    exercise_slug: "front-split",
+    block: "flexibility",
+    prescription: { sets: 1, hold_seconds: 45, per_side: true, rest_seconds: 15 },
+    rest_seconds: 15,
+    progression_rule_code: "FRONT_SPLIT_V1",
+    progression_scope: "global_skill",
+  }),
+];
+
+resetSeq();
+const circuitBItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
+  ironCrossItem(10, { holdSeconds: 10 }),
+  ...circuitRoundItems(1, "B"),
+  ...circuitRoundItems(2, "B"),
+  item({
+    exercise_slug: "couch-stretch",
+    block: "flexibility",
+    prescription: { sets: 1, hold_seconds: 45, per_side: true, rest_seconds: 15 },
+    rest_seconds: 15,
+  }),
+  item({
+    exercise_slug: "front-split",
+    block: "flexibility",
+    prescription: { sets: 1, hold_seconds: 45, per_side: true, rest_seconds: 15 },
+    rest_seconds: 15,
+    progression_rule_code: "FRONT_SPLIT_V1",
+    progression_scope: "global_skill",
+  }),
+];
+
+resetSeq();
+const murphItems: RoutineItemDef[] = [
+  ...dailySkillPrimerItems(),
+  ironCrossItem(10, { holdSeconds: 10 }),
+  item({
+    exercise_slug: "murph-run",
+    block: "run",
+    prescription: {
+      distance_m: 1600,
+      rest_seconds: 60,
+      notes: "First 1.6 km — controlled, not maximal",
+    },
+    rest_seconds: 60,
+  }),
+  item({
+    exercise_slug: "murph-round",
+    block: "conditioning",
+    prescription: {
+      sets: 20,
+      rest_seconds: 0,
+      notes:
+        "20 rounds: 5 pull-ups + 10 push-ups + 15 squats. Bodyweight by default; no vest unless the full session is comfortably controlled.",
+      extras: { pullups: 5, pushups: 10, squats: 15, vest_kg: 0 },
+    },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "murph-run",
+    block: "run",
+    prescription: {
+      distance_m: 1600,
+      rest_seconds: 0,
+      notes: "Second 1.6 km — steady finish, protect running form",
+    },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "couch-stretch",
+    block: "flexibility",
+    prescription: { sets: 1, hold_seconds: 60, per_side: true, rest_seconds: 15 },
+    rest_seconds: 15,
+  }),
+];
+
+resetSeq();
+const ringsItems: RoutineItemDef[] = [
+  item({
+    exercise_slug: "wrist-rocks",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-push-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 10, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "scapular-pull-up",
+    block: "warmup",
+    prescription: { sets: 1, reps_per_set: 8, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  oahsItem(4),
+  plancheItem(5, "hard"),
+  ironCrossItem(6, {
+    sets: 3,
+    holdSeconds: 12,
+    support: "supported_mid_forearm",
+  }),
+  flagItem(7, {
+    holdSeconds: 8,
+    saturday: true,
+    notes: "Quality flag exposure after Iron Cross",
+  }),
+  leverItem(8, "front-lever-hold", "hard"),
+  leverItem(9, "back-lever-hold", "hard"),
+  item({
+    exercise_slug: "handstand-push-up",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 5,
+      exercise_level: "wall",
+      rest_seconds: 150,
+    },
+    rest_seconds: 150,
+    level_from_state: true,
+    progression_rule_code: "HSPU_LEVEL_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "ring-pull-up",
+    block: "volume",
+    prescription: {
+      sets: 4,
+      reps_per_set: 8,
+      load_kg: 0,
+      rest_seconds: 120,
+      notes: "Add external load only after all 4×10 are clean",
+    },
+    rest_seconds: 120,
+  }),
+  item({
+    exercise_slug: "ring-dip",
+    block: "strength",
+    prescription: {
+      sets: 4,
+      reps_per_set: 8,
+      load_kg: 0,
+      rest_seconds: 120,
+      notes: "Stable rings; controlled bottom",
+    },
+    rest_seconds: 120,
+  }),
+  item({
+    exercise_slug: "ring-row",
+    block: "volume",
+    prescription: {
+      sets: 4,
+      reps_per_set: 12,
+      exercise_level: "rings_nipple_height",
+      rest_seconds: 90,
+      notes: "Feet under bar; lower rings/body angle to progress",
+    },
+    rest_seconds: 90,
+  }),
+  item({
+    exercise_slug: "ring-push-up",
+    block: "volume",
+    prescription: {
+      sets: 4,
+      reps_per_set: 12,
+      load_kg: 0,
+      exercise_level: "rings_knee_height",
+      rest_seconds: 90,
+      notes: "Shoulders under bar; lower rings to progress",
+    },
+    rest_seconds: 90,
+  }),
+  item({
+    exercise_slug: "ring-y-t",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 10,
+      exercise_level: "rings_hip_height",
+      rest_seconds: 75,
+      notes: "Each Y + T = 2 reps; step feet forward to progress",
+    },
+    rest_seconds: 75,
+  }),
+  item({
+    exercise_slug: "ring-biceps-curl",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 8,
+      exercise_level: "rings_nipple_height",
+      rest_seconds: 90,
+      notes: "Knees slightly bent; move feet forward to progress",
+    },
+    rest_seconds: 90,
+  }),
+  item({
+    exercise_slug: "ring-triceps-extension",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 8,
+      exercise_level: "rings_mid_thigh_height",
+      rest_seconds: 90,
+      notes: "Head under bar; lower rings / step back to progress",
+    },
+    rest_seconds: 90,
+  }),
+  item({
+    exercise_slug: "flexor-stretch",
+    block: "forearm",
+    prescription: { sets: 1, hold_seconds: 30, per_side: true, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+  item({
+    exercise_slug: "extensor-stretch",
+    block: "forearm",
+    prescription: { sets: 1, hold_seconds: 30, per_side: true, rest_seconds: 0 },
+    rest_seconds: 0,
+  }),
+];
+
+resetSeq();
 const dailySkillItems: RoutineItemDef[] = [
   ...dailySkillPrimerItems(),
 ];
