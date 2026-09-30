@@ -589,14 +589,16 @@ export function recalculateSchedule(opts: {
             isActiveScheduled(s.status) &&
             isMainWorkoutRole(s.day_role),
         );
-        const nextDay = addDays(date, 1);
-        const mainNext = working.some(
+        const hasOtherSpecialty = working.some(
           (s) =>
-            s.date === nextDay &&
+            s.date === date &&
+            s.id !== missed.id &&
             isActiveScheduled(s.status) &&
-            isMainWorkoutRole(s.day_role),
+            (s.day_role === "boxing" ||
+              s.day_role === "swim_performance" ||
+              s.day_role === "swim_recovery"),
         );
-        if (hasMain || mainNext) continue;
+        if (hasMain || hasOtherSpecialty) continue;
         target = date;
         break;
       }
