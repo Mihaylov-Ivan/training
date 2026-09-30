@@ -7,7 +7,7 @@ import type {
 import { generateScheduledSessions } from "@/lib/training/schedule";
 import { normalizeScheduledSessions } from "@/lib/training/normalize-schedule";
 
-export const CURRENT_SCHEDULE_RESET_VERSION = 3;
+export const CURRENT_SCHEDULE_RESET_VERSION = 4;
 
 export function buildFutureScheduleReset(opts: {
   userId: string;
@@ -46,7 +46,7 @@ export function buildFutureScheduleReset(opts: {
   const regenerated = generateScheduledSessions({
     userId: opts.userId,
     cycle: opts.cycle,
-    weeksAhead: opts.weeksAhead ?? 6,
+    weeksAhead: opts.weeksAhead ?? 12,
     weekdayMap: opts.weekdayMap,
     existing: preserved,
   });
