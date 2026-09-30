@@ -140,15 +140,24 @@ function scheduleKey(session: ScheduledSession): string {
   return `${session.date}:${scheduleSlot(session)}`;
 }
 
-function embedsDailySkill(role: DayRole): boolean {
+function roleEmbedsDailySkill(role: DayRole): boolean {
   return isMainWorkoutRoleLocal(role) && role !== "gym_workout";
+}
+
+export function scheduledSessionEmbedsDailySkill(
+  session: Pick<ScheduledSession, "day_role" | "routine_template_id">,
+): boolean {
+  if (session.day_role === "gym_workout") {
+    return session.routine_template_id === "routine-gym-replacement-skills";
+  }
+  return roleEmbedsDailySkill(session.day_role);
 }
 
 function needsSeparateDailySkill(role: DayRole): boolean {
   return (
     role !== "daily_skill_practice" &&
     role !== "recovery" &&
-    !embedsDailySkill(role)
+    !roleEmbedsDailySkill(role)
   );
 }
 
@@ -184,7 +193,7 @@ export function canonicalizeLiveScheduleRows(
 
   const mainDates = new Set(
     [...liveByKey.values()]
-      .filter((session) => embedsDailySkill(session.day_role))
+      .filter((session) => scheduledSessionEmbedsDailySkill(session))
       .map((session) => session.date),
   );
 
