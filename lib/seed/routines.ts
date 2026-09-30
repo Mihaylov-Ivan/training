@@ -409,7 +409,8 @@ const mondayItems: RoutineItemDef[] = [
   // then HSPU → muscle-up → remaining strength/power/core/flex.
   oahsItem(9),
   plancheItem(10, "hard"),
-  flagItem(11, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
+  ironCrossItem(11),
+  flagItem(12, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
   leverItem(12, "front-lever-hold", "hard"),
   leverItem(13, "back-lever-hold", "hard"),
   item({
@@ -463,6 +464,15 @@ const mondayItems: RoutineItemDef[] = [
     rest_seconds: 150,
     load_from_state: true,
     progression_rule_code: "WEIGHTED_PULLUP_4X5_V1",
+    progression_scope: "routine_item",
+  }),
+  item({
+    exercise_slug: "parallel-bar-dip",
+    block: "strength",
+    prescription: { sets: 4, reps_per_set: 10, load_kg: 0, rest_seconds: 90 },
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "DIP_VOLUME_V1",
     progression_scope: "routine_item",
   }),
   item({
@@ -567,12 +577,6 @@ const wednesdayBase: RoutineItemDef[] = [
     rest_seconds: 0,
   }),
   item({
-    exercise_slug: "easy-jog",
-    block: "warmup",
-    prescription: { duration_seconds: 120, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
     exercise_slug: "leg-swings-front-back",
     block: "warmup",
     prescription: { sets: 1, reps_per_set: 10, per_side: true, rest_seconds: 0 },
@@ -584,29 +588,9 @@ const wednesdayBase: RoutineItemDef[] = [
     prescription: { sets: 1, reps_per_set: 10, per_side: true, rest_seconds: 0 },
     rest_seconds: 0,
   }),
-  item({
-    exercise_slug: "walking-lunge",
-    block: "warmup",
-    prescription: { sets: 1, reps_per_set: 8, per_side: true, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
-    exercise_slug: "high-knees",
-    block: "warmup",
-    prescription: { duration_seconds: 20, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
-  item({
-    exercise_slug: "butt-kicks",
-    block: "warmup",
-    prescription: { duration_seconds: 20, rest_seconds: 0 },
-    rest_seconds: 0,
-  }),
   oahsItem(8),
   plancheItem(9, "medium"),
-  flagItem(10, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
-  leverItem(11, "front-lever-hold", "light"),
-  leverItem(12, "back-lever-hold", "light"),
+  ironCrossItem(10, { holdSeconds: 10 }),
   item({
     sequence: 12,
     exercise_slug: "20m-acceleration-sprint",
@@ -840,13 +824,28 @@ const saturdayItems: RoutineItemDef[] = [
   }),
   oahsItem(9),
   plancheItem(10, "hard"),
-  flagItem(11, {
+  ironCrossItem(11),
+  flagItem(12, {
     holdSeconds: 8,
     saturday: true,
     notes: "Saturday flag context",
   }),
   leverItem(12, "front-lever-hold", "hard"),
   leverItem(13, "back-lever-hold", "hard"),
+  item({
+    exercise_slug: "handstand-push-up",
+    block: "strength",
+    prescription: {
+      sets: 3,
+      reps_per_set: 5,
+      exercise_level: "wall",
+      rest_seconds: 150,
+    },
+    rest_seconds: 150,
+    level_from_state: true,
+    progression_rule_code: "HSPU_LEVEL_V1",
+    progression_scope: "routine_item",
+  }),
   item({
     sequence: 14,
     exercise_slug: "strict-muscle-up",
@@ -898,11 +897,18 @@ const saturdayItems: RoutineItemDef[] = [
   }),
   item({
     sequence: 17,
-    exercise_slug: "walking-lunge",
+    exercise_slug: "bulgarian-split-squat",
     block: "legs",
-    prescription: { sets: 3, reps_per_set: 12, per_side: true, rest_seconds: 60 },
-    rest_seconds: 60,
-    progression_rule_code: "WALKING_LUNGE_V1",
+    prescription: {
+      sets: 3,
+      reps_per_set: 10,
+      load_kg: 0,
+      per_side: true,
+      rest_seconds: 90,
+    },
+    rest_seconds: 90,
+    load_from_state: true,
+    progression_rule_code: "BULGARIAN_SPLIT_V1",
     progression_scope: "routine_item",
   }),
   item({
