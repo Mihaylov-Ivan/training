@@ -85,8 +85,8 @@ function statusLabel(s: ScheduledSession): string {
   if (s.status === "pending_missed_confirmation" || s.status === "overdue")
     return "Needs confirm";
   if (s.status === "in_progress") return "In progress";
-  if (s.missed_note?.startsWith("Automatic substitute:")) {
-    return "↻ Substituted";
+  if (s.missed_note?.startsWith("Fixed replacement:")) {
+    return "↻ Fixed replacement";
   }
   if (s.auto_rescheduled || s.rescheduled_from_id) return "↪ Moved here";
   if (s.is_deload) return "Deload";
@@ -508,7 +508,7 @@ export default function PlanPage() {
                           ? s.missed_reason
                             ? `Missed · ${s.missed_reason.replaceAll("_", " ")}`
                             : "Marked missed — kept in history"
-                          : s.missed_note?.startsWith("Automatic substitute:")
+                          : s.missed_note?.startsWith("Fixed replacement:")
                             ? s.missed_note
                             : s.rescheduled_from_id || s.auto_rescheduled
                               ? `Originally ${s.original_date}`
@@ -522,7 +522,7 @@ export default function PlanPage() {
                             ? "danger"
                             : s.rescheduled_from_id ||
                                 s.auto_rescheduled ||
-                                s.missed_note?.startsWith("Automatic substitute:")
+                                s.missed_note?.startsWith("Fixed replacement:")
                               ? "accent"
                               : statusTone(s.status)
                         }
@@ -579,10 +579,7 @@ export default function PlanPage() {
                     selected >= today &&
                     s.day_role !== "daily_skill_practice" &&
                     s.day_role !== "recovery" &&
-                    !(
-                      s.day_role === "gym_workout" &&
-                      s.missed_note?.startsWith("Automatic substitute:")
-                    ) ? (
+                    !s.missed_note?.startsWith("Fixed replacement:") ? (
                       <SecondaryButton
                         className="flex-1"
                         disabled={smartAdjustingId === s.id}
@@ -601,8 +598,7 @@ export default function PlanPage() {
                           ? "Optimising…"
                           : s.day_role === "climbing" ||
                               s.day_role === "swim_performance" ||
-                              s.day_role === "swim_recovery" ||
-                              s.missed_note?.startsWith("Automatic substitute:")
+                              s.day_role === "swim_recovery"
                             ? "Auto substitute"
                             : "Smart swap"}
                       </SecondaryButton>
