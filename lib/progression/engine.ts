@@ -87,6 +87,10 @@ export function evaluateProgression(
     "DIP_VOLUME_V1",
     "PUSHUP_VOLUME_V1",
     "WALKING_LUNGE_V1",
+    "DRAGON_FLAG_V1",
+    "HANGING_SLR_V1",
+    "PISTOL_SQUAT_V1",
+    "NORDIC_CURL_V1",
     "CALF_RAISE_V1",
   ]);
   if (actualLoadKg != null && loadAwareRules.has(input.ruleCode)) {
@@ -539,10 +543,10 @@ export function evaluateProgression(
         state.state.fail_credits = fails;
         state.state.success_credits = 0;
         if (fails >= 2) {
-          state.state.load_kg = Math.max(0, Number(state.state.load_kg ?? 0) - 1);
+          state.state.load_kg = Math.max(0, Number(state.state.load_kg ?? 0) - 2.5);
           state.state.fail_credits = 0;
           eventType = "failure";
-          explanation = `Two failures → remove 1 kg (now +${state.state.load_kg} kg).`;
+          explanation = `Two failures → remove 2.5 kg (now +${state.state.load_kg} kg).`;
         } else {
           eventType = "failure";
           explanation = "Failure — keep load.";
@@ -781,7 +785,7 @@ function applyGenericVolumeRule(
       let load = Number(state.state.load_kg ?? 0);
       if (reps < 8) reps += 1;
       else {
-        load += 0.5;
+        load += 2.5;
         reps = 6;
       }
       state.state.reps_per_set = reps;
@@ -850,7 +854,7 @@ function applyGenericVolumeRule(
         }
       } else if (reps < 10) reps += 1;
       else {
-        load += 0.5;
+        load += 2.5;
         reps = 8;
       }
       state.state.reps_per_set = reps;
@@ -863,7 +867,7 @@ function applyGenericVolumeRule(
       };
     }
     case "PISTOL_SQUAT_V1": {
-      state.state.load_kg = Number(state.state.load_kg ?? 0) + 1;
+      state.state.load_kg = Number(state.state.load_kg ?? 0) + 2.5;
       return {
         explanation: `Pistol success → +${state.state.load_kg} kg.`,
         preview: `Next: 3 × 6/leg @ +${state.state.load_kg} kg`,
@@ -893,7 +897,7 @@ function applyGenericVolumeRule(
       else if (ecc < 5) ecc += 1;
       else if (reps < 7) reps += 1;
       else {
-        load += 1;
+        load += 2.5;
         reps = 5;
         ecc = 3;
       }
