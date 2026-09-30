@@ -1728,6 +1728,9 @@ const ringsItems: RoutineItemDef[] = [
       notes: "Add external load only after all 4×10 are clean",
     },
     rest_seconds: 120,
+    load_from_state: true,
+    progression_rule_code: "PULLUP_VOLUME_V1",
+    progression_scope: "routine_item",
   }),
   item({
     exercise_slug: "ring-dip",
@@ -1740,6 +1743,9 @@ const ringsItems: RoutineItemDef[] = [
       notes: "Stable rings; controlled bottom",
     },
     rest_seconds: 120,
+    load_from_state: true,
+    progression_rule_code: "DIP_VOLUME_V1",
+    progression_scope: "routine_item",
   }),
   item({
     exercise_slug: "ring-row",
