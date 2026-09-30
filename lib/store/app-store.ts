@@ -872,6 +872,7 @@ export const useAppStore = create<AppState>()(
             ? ({
                 "oahs-practice": "oahs",
                 "planche-hold": "planche",
+                "iron-cross-hold": "iron_cross",
                 "one-leg-human-flag": "human_flag",
                 "front-lever-hold": "front_lever",
                 "back-lever-hold": "back_lever",
