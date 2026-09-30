@@ -372,12 +372,37 @@ export function SessionPlayer({ sessionId }: { sessionId: string }) {
               >
                 −2.5
               </SecondaryButton>
-              <div className="min-w-24 text-center">
-                <p className="text-xs text-muted">Actual load</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {actualLoad ?? 0} kg
-                </p>
-              </div>
+              <label className="min-w-28 text-center">
+                <span className="block text-xs text-muted">Actual load</span>
+                <span className="mt-1 flex items-center justify-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="2.5"
+                    inputMode="decimal"
+                    className="w-20 rounded-xl border border-border bg-background px-2 py-2 text-center text-lg font-semibold tabular-nums"
+                    value={actualLoad ?? 0}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      setActualLoad(
+                        Number.isFinite(value) ? Math.max(0, value) : 0,
+                      );
+                    }}
+                    onBlur={() =>
+                      setActualLoad((load) =>
+                        Math.max(
+                          0,
+                          Number(
+                            (Math.round((load ?? 0) / 2.5) * 2.5).toFixed(1),
+                          ),
+                        ),
+                      )
+                    }
+                    aria-label="Actual load in kilograms"
+                  />
+                  <span className="text-sm text-muted">kg</span>
+                </span>
+              </label>
               <SecondaryButton
                 aria-label="Increase actual load"
                 onClick={() =>
