@@ -114,7 +114,16 @@ describe("adaptive schedule engine", () => {
       .filter(
         (s) =>
           s.status === "scheduled" &&
-          ["strength_power", "athleticism_endurance", "calisthenics_volume"].includes(
+          [
+            "strength_power",
+            "athleticism_endurance",
+            "calisthenics_volume",
+            "rings_workout",
+            "circuit_workout",
+            "murph",
+            "climbing",
+            "gym_workout",
+          ].includes(
             s.day_role,
           ),
       )
@@ -156,7 +165,7 @@ describe("adaptive schedule engine", () => {
   it("Saturday main workout missed — proposes shift or skip without stacking Sun+Mon", () => {
     const { cycle, sessions } = buildWeek();
     const sat = byDate(sessions, addDays(START, 5))!;
-    expect(sat.day_role).toBe("calisthenics_volume");
+    expect(sat.day_role).toBe("rings_workout");
     const proposal = recalculateSchedule({
       missedSession: sat,
       upcomingSessions: sessions,
@@ -221,7 +230,16 @@ describe("adaptive schedule engine", () => {
         (s) =>
           s.date === m.to_date &&
           s.status === "scheduled" &&
-          ["strength_power", "athleticism_endurance", "calisthenics_volume"].includes(
+          [
+            "strength_power",
+            "athleticism_endurance",
+            "calisthenics_volume",
+            "rings_workout",
+            "circuit_workout",
+            "murph",
+            "climbing",
+            "gym_workout",
+          ].includes(
             s.day_role,
           ),
       );
@@ -257,7 +275,16 @@ describe("adaptive schedule engine", () => {
         (s) =>
           s.date === makeup.date &&
           s.status === "scheduled" &&
-          ["strength_power", "athleticism_endurance", "calisthenics_volume"].includes(
+          [
+            "strength_power",
+            "athleticism_endurance",
+            "calisthenics_volume",
+            "rings_workout",
+            "circuit_workout",
+            "murph",
+            "climbing",
+            "gym_workout",
+          ].includes(
             s.day_role,
           ),
       );
