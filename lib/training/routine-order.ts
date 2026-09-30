@@ -3,6 +3,7 @@ import type { Block, RoutineItemDef } from "@/lib/types";
 const SKILL_SLUG_ORDER = [
   "oahs-practice",
   "planche-hold",
+  "iron-cross-hold",
   "one-leg-human-flag",
   "front-lever-hold",
   "back-lever-hold",
@@ -11,13 +12,9 @@ const SKILL_SLUG_ORDER = [
 const WARMUP_BLOCKS = new Set<Block>(["warmup", "maintenance"]);
 
 const POST_SKILL_WARMUP_SLUGS = new Set([
-  "easy-jog",
   "leg-swings-front-back",
   "leg-swings-lateral",
-  "walking-lunge",
   "ankle-pogo-hop",
-  "high-knees",
-  "butt-kicks",
   "air-squat",
   "bodyweight-squat",
   "reverse-lunge",
@@ -39,7 +36,7 @@ function workTier(item: RoutineItemDef): number {
 /**
  * Session order:
  * 1. Wrist / shoulder / upper-body preparation
- * 2. Skills — OAHS → planche → human flag → front lever → back lever
+ * 2. Skills — OAHS → planche → iron cross → human flag → front lever → back lever
  * 3. Lower-body / cardio warm-up
  * 4. Main strength, power, endurance and flexibility work
  */
