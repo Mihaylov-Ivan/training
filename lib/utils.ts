@@ -154,6 +154,16 @@ export function createInitialProgressionStates(
       draft.planche_level,
     ),
     base(
+      "iron_cross",
+      "global_skill",
+      {
+        level: "supported_mid_forearm",
+        hold_seconds: 12,
+        success_credits: 0,
+      },
+      "supported_mid_forearm",
+    ),
+    base(
       "human_flag",
       "global_skill",
       {
