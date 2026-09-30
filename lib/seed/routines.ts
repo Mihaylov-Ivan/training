@@ -1873,7 +1873,11 @@ const climbItems: RoutineItemDef[] = [
   oahsItem(6),
   plancheItem(7, "hard"),
   ironCrossItem(8),
-  flagItem(9, { holdSeconds: 6, notes: "Left → right → 60 sec" }),
+  flagItem(9, {
+    holdSeconds: 8,
+    saturday: true,
+    notes: "Saturday quality exposure after Iron Cross · left → right → 60 sec",
+  }),
   leverItem(9, "front-lever-hold", "light"),
   leverItem(10, "back-lever-hold", "light"),
   item({
