@@ -101,17 +101,36 @@ export function estimateItemDurationSeconds(item: RoutineItemDef): number {
   );
 }
 
-function totalMinutesFromItems(
-  items: {
-    seconds: number;
-    betweenExerciseRest: number;
-  }[],
+function transitionEstimateSeconds(
+  current: Pick<RoutineItemDef, "block" | "exercise_slug" | "prescription">,
+  next: Pick<RoutineItemDef, "block" | "exercise_slug" | "prescription">,
+): number {
+  const currentCircuit = current.prescription.extras?.circuit_id;
+  const nextCircuit = next.prescription.extras?.circuit_id;
+  if (
+    typeof currentCircuit === "string" &&
+    currentCircuit === nextCircuit
+  ) {
+    return 0;
+  }
+  const roundRest = current.prescription.extras?.round_rest_seconds;
+  if (typeof roundRest === "number" && roundRest > 0) {
+    return roundRest;
+  }
+  return recommendedBetweenExerciseRest(current);
+}
+
+function totalMinutesFromRoutineItems(
+  items: RoutineItemDef[],
 ): number {
   if (items.length === 0) return 0;
   let totalSec = 0;
   for (let i = 0; i < items.length; i++) {
-    totalSec += items[i]!.seconds;
-    if (i < items.length - 1) totalSec += items[i]!.betweenExerciseRest;
+    const current = items[i]!;
+    totalSec += estimateItemDurationSeconds(current);
+    if (i < items.length - 1) {
+      totalSec += transitionEstimateSeconds(current, items[i + 1]!);
+    }
   }
   return Math.max(1, Math.round(totalSec / 60));
 }
@@ -123,12 +142,7 @@ export function estimateRoutineDurationMin(
   routine: Pick<RoutineTemplateDef, "items">,
 ): number {
   const items = routine.items.slice().sort((a, b) => a.sequence - b.sequence);
-  return totalMinutesFromItems(
-    items.map((item) => ({
-      seconds: estimateItemDurationSeconds(item),
-      betweenExerciseRest: recommendedBetweenExerciseRest(item),
-    })),
-  );
+  return totalMinutesFromRoutineItems(items);
 }
 
 /**
@@ -141,17 +155,28 @@ export function estimateSessionDurationMin(
   >[],
 ): number {
   const sorted = items.slice().sort((a, b) => a.sequence - b.sequence);
-  return totalMinutesFromItems(
-    sorted.map((item) => ({
-      seconds: estimateFromPrescription(
-        item.prescription_snapshot,
-        item.exercise_slug,
-      ),
-      betweenExerciseRest: recommendedBetweenExerciseRest({
-        block: item.block,
-        exercise_slug: item.exercise_slug,
-        prescription: item.prescription_snapshot,
-      }),
-    })),
-  );
+  if (sorted.length === 0) return 0;
+  let totalSec = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const current = sorted[i]!;
+    totalSec += estimateFromPrescription(
+      current.prescription_snapshot,
+      current.exercise_slug,
+    );
+    if (i < sorted.length - 1) {
+      totalSec += transitionEstimateSeconds(
+        {
+          block: current.block,
+          exercise_slug: current.exercise_slug,
+          prescription: current.prescription_snapshot,
+        },
+        {
+          block: sorted[i + 1]!.block,
+          exercise_slug: sorted[i + 1]!.exercise_slug,
+          prescription: sorted[i + 1]!.prescription_snapshot,
+        },
+      );
+    }
+  }
+  return Math.max(1, Math.round(totalSec / 60));
 }
