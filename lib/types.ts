@@ -91,6 +91,9 @@ export type AdaptiveSessionKind =
   | "RUNNING"
   | "SWIMMING"
   | "BOXING"
+  | "CIRCUIT"
+  | "RINGS"
+  | "MURPH"
   | "CLIMBING"
   | "DELOAD_WORKOUT";
 
@@ -107,6 +110,9 @@ export type DayRole =
   | "swim_recovery"
   | "boxing"
   | "gym_workout"
+  | "circuit_workout"
+  | "rings_workout"
+  | "murph"
   | "calisthenics_volume"
   | "climbing"
   | "recovery";
