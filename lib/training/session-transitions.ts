@@ -22,6 +22,20 @@ export function transitionRestSeconds(
   current: SessionItem,
   next: SessionItem,
 ): number {
+  const currentCircuit = current.prescription_snapshot.extras?.circuit_id;
+  const nextCircuit = next.prescription_snapshot.extras?.circuit_id;
+  if (
+    typeof currentCircuit === "string" &&
+    currentCircuit === nextCircuit
+  ) {
+    return 0;
+  }
+  const roundRest =
+    current.prescription_snapshot.extras?.round_rest_seconds;
+  if (typeof roundRest === "number" && roundRest > 0) {
+    return roundRest;
+  }
+
   if (current.block === "warmup" && next.block === "skill") {
     return PRE_SKILL_REST_SECONDS;
   }
@@ -84,7 +98,7 @@ const SUBSTITUTIONS: Record<string, Substitution> = {
     prescription: { sets: 4, reps_per_set: 12, rest_seconds: 90 },
   },
   "bulgarian-split-squat": {
-    slug: "walking-lunge",
+    slug: "reverse-lunge",
     block: "legs",
     prescription: {
       sets: 3,
@@ -114,7 +128,7 @@ const SUBSTITUTIONS: Record<string, Substitution> = {
     },
   },
   "single-leg-rdl": {
-    slug: "walking-lunge",
+    slug: "reverse-lunge",
     block: "legs",
     prescription: {
       sets: 3,
@@ -139,9 +153,9 @@ const SUBSTITUTIONS: Record<string, Substitution> = {
     prescription: { sets: 3, reps_per_set: 10, rest_seconds: 60 },
   },
   "20m-acceleration-sprint": {
-    slug: "high-knees",
-    block: "speed",
-    prescription: { sets: 4, duration_seconds: 20, rest_seconds: 60 },
+    slug: "jumping-squat",
+    block: "power",
+    prescription: { sets: 4, reps_per_set: 8, rest_seconds: 60 },
   },
   "burpee": {
     slug: "mountain-climber",
